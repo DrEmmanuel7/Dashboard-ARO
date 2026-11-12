@@ -2,6 +2,7 @@ import json
 import os
 import re
 import base64
+from datetime import datetime
 
 print("Starting dashboard generator...")
 
@@ -116,20 +117,37 @@ html_template = """<!DOCTYPE html>
         </div>
       </div>
 
-      <!-- Action Buttons -->
+      <!-- Action Buttons & Database Status Indicator -->
       <div class="flex items-center gap-2.5 no-print">
-        <button id="btn-open-upload" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-700/70 hover:bg-brand-600 text-brand-50 rounded-lg text-xs font-semibold shadow-sm transition-all border border-brand-500/30 backdrop-blur-sm">
-          <svg class="w-4 h-4 text-brand-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        <!-- Active Database Status Indicator -->
+        <div id="dataset-status-pill" class="flex items-center gap-2 bg-brand-900/90 px-3.5 py-1.5 rounded-xl border border-brand-700/60 shadow-xs text-xs backdrop-blur-sm">
+          <span id="dataset-status-dot" class="w-2.5 h-2.5 rounded-full bg-slate-400 ring-2 ring-white/20"></span>
+          <span class="text-brand-300 font-medium text-[11px]">Base :</span>
+          <span id="dataset-status-name" class="font-bold text-white max-w-[170px] truncate" title="Base d'origine SCG-Ré">Base d'origine</span>
+          <span id="dataset-status-detail" class="text-brand-200/70 text-[10px] hidden md:inline">(498 affaires)</span>
+          <button id="btn-reset-dataset" title="Rétablir la base de données d'origine de la SCG-Ré" class="hidden text-amber-300 hover:text-amber-100 text-[11px] font-semibold flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 ml-1 transition-all">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Rétablir
+          </button>
+        </div>
+
+        <button id="btn-open-upload" class="inline-flex items-center gap-2 px-3.5 py-1.5 bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-500 hover:to-brand-600 text-white rounded-xl text-xs font-semibold shadow-xs hover:shadow transition-all duration-150 border border-brand-400/30 active:scale-95">
+          <svg class="w-4 h-4 text-brand-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
           Importer Nouveau Fichier Excel
         </button>
 
-        <button id="btn-export-cleaned" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold shadow-sm transition-all">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <button id="btn-download-html" title="Télécharger le fichier index.html autonome avec ces nouvelles données" class="hidden inline-flex items-center gap-2 px-3.5 py-1.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-xl text-xs font-semibold shadow-xs hover:shadow transition-all duration-150 border border-indigo-400/30 active:scale-95">
+          <svg class="w-4 h-4 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+          Télécharger HTML à jour
+        </button>
+
+        <button id="btn-export-cleaned" class="inline-flex items-center gap-2 px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-xl text-xs font-semibold shadow-xs hover:shadow transition-all duration-150 border border-emerald-400/30 active:scale-95">
+          <svg class="w-4 h-4 text-emerald-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
           Exporter Excel Propre
         </button>
 
-        <button onclick="window.print()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700 transition-all">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+        <button onclick="window.print()" class="inline-flex items-center gap-2 px-3.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-semibold border border-slate-700 shadow-xs transition-all duration-150 active:scale-95">
+          <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
           Imprimer / PDF
         </button>
       </div>
@@ -138,7 +156,7 @@ html_template = """<!DOCTYPE html>
   </header>
 
   <!-- STICKY FILTER BAR (PLEINE LARGEUR - FILTRE UNIQUE BRANCHE) -->
-  <section class="bg-white border-b border-slate-200 shadow-sm sticky top-[65px] z-30 no-print">
+  <section class="bg-white border-b border-slate-200/90 shadow-xs sticky top-[65px] z-30 no-print">
     <div class="w-full px-4 sm:px-6 lg:px-8 py-3">
       <div class="flex flex-wrap items-center justify-between gap-4">
         
@@ -151,14 +169,14 @@ html_template = """<!DOCTYPE html>
           <select id="filter-branche" class="w-full bg-slate-50 border border-slate-300 text-slate-700 text-xs font-medium rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors shadow-xs">
             <option value="ALL">Toutes les branches</option>
           </select>
-          <button id="btn-reset-filters" title="Réinitialiser le filtre" class="inline-flex items-center justify-center p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg border border-slate-300 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          <button id="btn-reset-filters" title="Réinitialiser le filtre" class="inline-flex items-center justify-center p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg border border-slate-300 shadow-xs transition-all active:scale-90">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
           </button>
         </div>
 
         <!-- Active filter status pill & Monnaie -->
         <div class="flex items-center gap-4 text-xs text-slate-500">
-          <div id="filter-status-text" class="font-medium text-slate-600 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
+          <div id="filter-status-text" class="font-medium text-slate-600 bg-slate-100 px-3.5 py-1.5 rounded-full border border-slate-200/80 shadow-xs">
             Affichage de <span class="font-bold text-brand-600" id="filtered-count">0</span> affaires sur <span class="font-bold" id="total-count-badge">0</span>
           </div>
           <div class="text-[11px] text-slate-400 font-medium">
@@ -170,24 +188,36 @@ html_template = """<!DOCTYPE html>
     </div>
   </section>
 
-  <!-- NAVIGATION TABS (PLEINE LARGEUR - 3 ONGLETS) -->
-  <nav class="bg-white border-b border-slate-200 no-print">
+  <!-- NAVIGATION TABS (EXECUTIVE SEGMENTED CONTROL) -->
+  <nav class="bg-slate-100/80 border-b border-slate-200/90 py-2.5 no-print">
     <div class="w-full px-4 sm:px-6 lg:px-8">
-      <div class="flex space-x-2 sm:space-x-4 overflow-x-auto custom-scrollbar py-2 text-xs font-semibold" id="tab-nav-container">
+      <div class="inline-flex p-1 bg-white/90 rounded-xl border border-slate-200/90 shadow-xs space-x-1.5 overflow-x-auto custom-scrollbar" id="tab-nav-container">
         
-        <button data-tab="tab-souscrite" class="tab-btn active px-4 py-2.5 rounded-lg bg-brand-50 text-brand-700 border border-brand-200/80 shadow-xs flex items-center gap-2 whitespace-nowrap transition-all">
-          <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-          1. Vue Prime souscrite (Valeurs brutes SCG-Ré)
+        <!-- Tab 1: Souscrite -->
+        <button data-tab="tab-souscrite" id="tab-btn-souscrite" class="tab-btn active px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 flex items-center gap-2 whitespace-nowrap bg-brand-600 text-white shadow-sm shadow-brand-500/25 ring-1 ring-brand-700">
+          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          <span>1. Vue Prime souscrite</span>
+          <span id="badge-tab-souscrite" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-white/20 text-white ml-1">
+            498 affaires
+          </span>
         </button>
 
-        <button data-tab="tab-signee" class="tab-btn px-4 py-2.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center gap-2 whitespace-nowrap transition-all">
-          <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          2. Vue Prime signée (Bordereaux reçus)
+        <!-- Tab 2: Signée (Bouton Vert de base distinctif) -->
+        <button data-tab="tab-signee" id="tab-btn-signee" class="tab-btn px-4 py-2 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300/80 hover:bg-emerald-100 hover:border-emerald-400 transition-all duration-200 flex items-center gap-2 whitespace-nowrap shadow-2xs">
+          <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span>2. Vue Prime signée (Bordereaux reçus)</span>
+          <span id="badge-tab-signee" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-300/70 ml-1">
+            133 bordereaux
+          </span>
         </button>
 
-        <button data-tab="tab-data" class="tab-btn px-4 py-2.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center gap-2 whitespace-nowrap transition-all">
+        <!-- Tab 3: Explorateur -->
+        <button data-tab="tab-data" id="tab-btn-data" class="tab-btn px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all duration-200 flex items-center gap-2 whitespace-nowrap">
           <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 4h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-          3. Explorateur de Données & Export
+          <span>3. Explorateur de Données & Export</span>
+          <span id="badge-tab-data" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-200 text-slate-700 ml-1">
+            Tableau
+          </span>
         </button>
 
       </div>
@@ -302,10 +332,10 @@ html_template = """<!DOCTYPE html>
         </span>
       </div>
 
-      <!-- 2x2 Grid : Branche & Pays -->
+      <!-- 2x2 Grid : Branche & Pays (avec Bascule Graphique / Tableau Complet) -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        <!-- Graphique 1: Prime souscrite par Branche -->
+        <!-- Bloc 1: Prime souscrite par Branche -->
         <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col">
           <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
             <div>
@@ -315,14 +345,43 @@ html_template = """<!DOCTYPE html>
               </h3>
               <p class="text-[11px] text-slate-500">Classée par ordre décroissant (FCFA)</p>
             </div>
-            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-brand-50 text-brand-700 border border-brand-200" id="count-branches-souscrite">11 branches</span>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-brand-50 text-brand-700 border border-brand-200" id="count-branches-souscrite">11 branches</span>
+              <!-- Toggle Graphique / Tableau -->
+              <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
+                <button id="btn-toggle-souscrite-branche-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
+                  Graphique Top
+                </button>
+                <button id="btn-toggle-souscrite-branche-table" class="px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
+                  Tableau Complet
+                </button>
+              </div>
+            </div>
           </div>
-          <div class="h-80 relative flex-1">
+          <!-- Vue Graphique -->
+          <div id="view-souscrite-branche-chart" class="h-80 relative flex-1">
             <canvas id="chart-souscrite-branche"></canvas>
+          </div>
+          <!-- Vue Tableau Complet -->
+          <div id="view-souscrite-branche-table" class="hidden flex-1 overflow-y-auto custom-scrollbar max-h-80">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-50 sticky top-0 text-[11px] uppercase tracking-wider text-slate-600 border-b border-slate-200">
+                <tr>
+                  <th class="py-2.5 px-3 font-bold w-12 text-center">Rang</th>
+                  <th class="py-2.5 px-3 font-bold">Branche</th>
+                  <th class="py-2.5 px-3 font-bold text-right">Prime Souscrite</th>
+                  <th class="py-2.5 px-3 font-bold text-center w-24">Affaires</th>
+                  <th class="py-2.5 px-3 font-bold text-right w-28">Part %</th>
+                </tr>
+              </thead>
+              <tbody id="table-souscrite-branche-body" class="divide-y divide-slate-100">
+                <!-- Rendu Dynamique -->
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <!-- Graphique 2: Prime souscrite par Pays -->
+        <!-- Bloc 2: Prime souscrite par Pays -->
         <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col">
           <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
             <div>
@@ -332,10 +391,39 @@ html_template = """<!DOCTYPE html>
               </h3>
               <p class="text-[11px] text-slate-500">Lieu du risque — Classé par ordre décroissant (FCFA)</p>
             </div>
-            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200" id="count-pays-souscrite">0 pays</span>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200" id="count-pays-souscrite">0 pays</span>
+              <!-- Toggle Graphique / Tableau -->
+              <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
+                <button id="btn-toggle-souscrite-pays-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
+                  Graphique Top
+                </button>
+                <button id="btn-toggle-souscrite-pays-table" class="px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
+                  Tableau Complet
+                </button>
+              </div>
+            </div>
           </div>
-          <div class="h-80 relative flex-1">
+          <!-- Vue Graphique -->
+          <div id="view-souscrite-pays-chart" class="h-80 relative flex-1">
             <canvas id="chart-souscrite-pays"></canvas>
+          </div>
+          <!-- Vue Tableau Complet -->
+          <div id="view-souscrite-pays-table" class="hidden flex-1 overflow-y-auto custom-scrollbar max-h-80">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-50 sticky top-0 text-[11px] uppercase tracking-wider text-slate-600 border-b border-slate-200">
+                <tr>
+                  <th class="py-2.5 px-3 font-bold w-12 text-center">Rang</th>
+                  <th class="py-2.5 px-3 font-bold">Pays</th>
+                  <th class="py-2.5 px-3 font-bold text-right">Prime Souscrite</th>
+                  <th class="py-2.5 px-3 font-bold text-center w-24">Affaires</th>
+                  <th class="py-2.5 px-3 font-bold text-right w-28">Part %</th>
+                </tr>
+              </thead>
+              <tbody id="table-souscrite-pays-body" class="divide-y divide-slate-100">
+                <!-- Rendu Dynamique -->
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -356,7 +444,7 @@ html_template = """<!DOCTYPE html>
             </div>
             <!-- Toggle Graphique / Tableau -->
             <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
-              <button id="btn-toggle-souscrite-cedante-chart" class="px-2.5 py-1 rounded-md font-semibold bg-white text-slate-800 shadow-xs transition-all">
+              <button id="btn-toggle-souscrite-cedante-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
                 Graphique Top 10
               </button>
               <button id="btn-toggle-souscrite-cedante-table" class="px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
@@ -375,10 +463,11 @@ html_template = """<!DOCTYPE html>
             <table class="w-full text-left text-xs border-collapse">
               <thead class="bg-slate-50 sticky top-0 text-[11px] uppercase tracking-wider text-slate-600 border-b border-slate-200">
                 <tr>
-                  <th class="py-2 px-2.5 font-bold w-12 text-center">Rang</th>
-                  <th class="py-2 px-2.5 font-bold">Cédante (Groupe)</th>
-                  <th class="py-2 px-2.5 font-bold text-right">Prime SCG-Ré</th>
-                  <th class="py-2 px-2.5 font-bold text-right w-20">Part %</th>
+                  <th class="py-2.5 px-3 font-bold w-12 text-center">Rang</th>
+                  <th class="py-2.5 px-3 font-bold">Cédante (Groupe)</th>
+                  <th class="py-2.5 px-3 font-bold text-right">Prime SCG-Ré</th>
+                  <th class="py-2.5 px-3 font-bold text-center w-24">Affaires</th>
+                  <th class="py-2.5 px-3 font-bold text-right w-28">Part %</th>
                 </tr>
               </thead>
               <tbody id="table-souscrite-cedante-body" class="divide-y divide-slate-100">
@@ -400,7 +489,7 @@ html_template = """<!DOCTYPE html>
             </div>
             <!-- Toggle Graphique / Tableau -->
             <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
-              <button id="btn-toggle-souscrite-courtier-chart" class="px-2.5 py-1 rounded-md font-semibold bg-white text-slate-800 shadow-xs transition-all">
+              <button id="btn-toggle-souscrite-courtier-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
                 Graphique Top 10
               </button>
               <button id="btn-toggle-souscrite-courtier-table" class="px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
@@ -419,10 +508,11 @@ html_template = """<!DOCTYPE html>
             <table class="w-full text-left text-xs border-collapse">
               <thead class="bg-slate-50 sticky top-0 text-[11px] uppercase tracking-wider text-slate-600 border-b border-slate-200">
                 <tr>
-                  <th class="py-2 px-2.5 font-bold w-12 text-center">Rang</th>
-                  <th class="py-2 px-2.5 font-bold">Courtier / Apporteur</th>
-                  <th class="py-2 px-2.5 font-bold text-right">Prime SCG-Ré</th>
-                  <th class="py-2 px-2.5 font-bold text-right w-20">Part %</th>
+                  <th class="py-2.5 px-3 font-bold w-12 text-center">Rang</th>
+                  <th class="py-2.5 px-3 font-bold">Courtier / Apporteur</th>
+                  <th class="py-2.5 px-3 font-bold text-right">Prime SCG-Ré</th>
+                  <th class="py-2.5 px-3 font-bold text-center w-24">Affaires</th>
+                  <th class="py-2.5 px-3 font-bold text-right w-28">Part %</th>
                 </tr>
               </thead>
               <tbody id="table-souscrite-courtier-body" class="divide-y divide-slate-100">
@@ -461,10 +551,10 @@ html_template = """<!DOCTYPE html>
         </div>
       </div>
 
-      <!-- 2x2 Grid : Branche & Pays (Signée) -->
+      <!-- 2x2 Grid : Branche & Pays (Signée avec Bascule Graphique / Tableau Complet) -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        <!-- Graphique 1: Prime signée par Branche -->
+        <!-- Bloc 1: Prime signée par Branche -->
         <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col">
           <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
             <div>
@@ -474,14 +564,43 @@ html_template = """<!DOCTYPE html>
               </h3>
               <p class="text-[11px] text-slate-500">Bordereaux reçus — Tri décroissant (FCFA)</p>
             </div>
-            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200" id="count-branches-signee">11 branches</span>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200" id="count-branches-signee">11 branches</span>
+              <!-- Toggle Graphique / Tableau -->
+              <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
+                <button id="btn-toggle-signee-branche-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
+                  Graphique Top
+                </button>
+                <button id="btn-toggle-signee-branche-table" class="px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
+                  Tableau Complet
+                </button>
+              </div>
+            </div>
           </div>
-          <div class="h-80 relative flex-1">
+          <!-- Vue Graphique -->
+          <div id="view-signee-branche-chart" class="h-80 relative flex-1">
             <canvas id="chart-signee-branche"></canvas>
+          </div>
+          <!-- Vue Tableau Complet -->
+          <div id="view-signee-branche-table" class="hidden flex-1 overflow-y-auto custom-scrollbar max-h-80">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-50 sticky top-0 text-[11px] uppercase tracking-wider text-slate-600 border-b border-slate-200">
+                <tr>
+                  <th class="py-2.5 px-3 font-bold w-12 text-center">Rang</th>
+                  <th class="py-2.5 px-3 font-bold">Branche</th>
+                  <th class="py-2.5 px-3 font-bold text-right">Prime Signée</th>
+                  <th class="py-2.5 px-3 font-bold text-center w-24">Bordereaux</th>
+                  <th class="py-2.5 px-3 font-bold text-right w-28">Part %</th>
+                </tr>
+              </thead>
+              <tbody id="table-signee-branche-body" class="divide-y divide-slate-100">
+                <!-- Rendu Dynamique -->
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <!-- Graphique 2: Prime signée par Pays -->
+        <!-- Bloc 2: Prime signée par Pays -->
         <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col">
           <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
             <div>
@@ -491,10 +610,39 @@ html_template = """<!DOCTYPE html>
               </h3>
               <p class="text-[11px] text-slate-500">Lieu du risque — Tri décroissant (FCFA)</p>
             </div>
-            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200" id="count-pays-signee">0 pays</span>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200" id="count-pays-signee">0 pays</span>
+              <!-- Toggle Graphique / Tableau -->
+              <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
+                <button id="btn-toggle-signee-pays-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
+                  Graphique Top
+                </button>
+                <button id="btn-toggle-signee-pays-table" class="px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
+                  Tableau Complet
+                </button>
+              </div>
+            </div>
           </div>
-          <div class="h-80 relative flex-1">
+          <!-- Vue Graphique -->
+          <div id="view-signee-pays-chart" class="h-80 relative flex-1">
             <canvas id="chart-signee-pays"></canvas>
+          </div>
+          <!-- Vue Tableau Complet -->
+          <div id="view-signee-pays-table" class="hidden flex-1 overflow-y-auto custom-scrollbar max-h-80">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-50 sticky top-0 text-[11px] uppercase tracking-wider text-slate-600 border-b border-slate-200">
+                <tr>
+                  <th class="py-2.5 px-3 font-bold w-12 text-center">Rang</th>
+                  <th class="py-2.5 px-3 font-bold">Pays</th>
+                  <th class="py-2.5 px-3 font-bold text-right">Prime Signée</th>
+                  <th class="py-2.5 px-3 font-bold text-center w-24">Bordereaux</th>
+                  <th class="py-2.5 px-3 font-bold text-right w-28">Part %</th>
+                </tr>
+              </thead>
+              <tbody id="table-signee-pays-body" class="divide-y divide-slate-100">
+                <!-- Rendu Dynamique -->
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -515,7 +663,7 @@ html_template = """<!DOCTYPE html>
             </div>
             <!-- Toggle Graphique / Tableau -->
             <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
-              <button id="btn-toggle-signee-cedante-chart" class="px-2.5 py-1 rounded-md font-semibold bg-white text-slate-800 shadow-xs transition-all">
+              <button id="btn-toggle-signee-cedante-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
                 Graphique Top 10
               </button>
               <button id="btn-toggle-signee-cedante-table" class="px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
@@ -534,10 +682,11 @@ html_template = """<!DOCTYPE html>
             <table class="w-full text-left text-xs border-collapse">
               <thead class="bg-slate-50 sticky top-0 text-[11px] uppercase tracking-wider text-slate-600 border-b border-slate-200">
                 <tr>
-                  <th class="py-2 px-2.5 font-bold w-12 text-center">Rang</th>
-                  <th class="py-2 px-2.5 font-bold">Cédante (Groupe)</th>
-                  <th class="py-2 px-2.5 font-bold text-right">Prime Signée</th>
-                  <th class="py-2 px-2.5 font-bold text-right w-20">Part %</th>
+                  <th class="py-2.5 px-3 font-bold w-12 text-center">Rang</th>
+                  <th class="py-2.5 px-3 font-bold">Cédante (Groupe)</th>
+                  <th class="py-2.5 px-3 font-bold text-right">Prime Signée</th>
+                  <th class="py-2.5 px-3 font-bold text-center w-24">Bordereaux</th>
+                  <th class="py-2.5 px-3 font-bold text-right w-28">Part %</th>
                 </tr>
               </thead>
               <tbody id="table-signee-cedante-body" class="divide-y divide-slate-100">
@@ -559,7 +708,7 @@ html_template = """<!DOCTYPE html>
             </div>
             <!-- Toggle Graphique / Tableau -->
             <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
-              <button id="btn-toggle-signee-courtier-chart" class="px-2.5 py-1 rounded-md font-semibold bg-white text-slate-800 shadow-xs transition-all">
+              <button id="btn-toggle-signee-courtier-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
                 Graphique Top 10
               </button>
               <button id="btn-toggle-signee-courtier-table" class="px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
@@ -578,10 +727,11 @@ html_template = """<!DOCTYPE html>
             <table class="w-full text-left text-xs border-collapse">
               <thead class="bg-slate-50 sticky top-0 text-[11px] uppercase tracking-wider text-slate-600 border-b border-slate-200">
                 <tr>
-                  <th class="py-2 px-2.5 font-bold w-12 text-center">Rang</th>
-                  <th class="py-2 px-2.5 font-bold">Courtier / Apporteur</th>
-                  <th class="py-2 px-2.5 font-bold text-right">Prime Signée</th>
-                  <th class="py-2 px-2.5 font-bold text-right w-20">Part %</th>
+                  <th class="py-2.5 px-3 font-bold w-12 text-center">Rang</th>
+                  <th class="py-2.5 px-3 font-bold">Courtier / Apporteur</th>
+                  <th class="py-2.5 px-3 font-bold text-right">Prime Signée</th>
+                  <th class="py-2.5 px-3 font-bold text-center w-24">Bordereaux</th>
+                  <th class="py-2.5 px-3 font-bold text-right w-28">Part %</th>
                 </tr>
               </thead>
               <tbody id="table-signee-courtier-body" class="divide-y divide-slate-100">
@@ -591,6 +741,56 @@ html_template = """<!DOCTYPE html>
           </div>
         </div>
 
+      </div>
+
+      <!-- ========================================== -->
+      <!-- BLOC 5: TOP 10 DES AFFAIRES SIGNÉES (PLEINE LARGEUR) -->
+      <!-- ========================================== -->
+      <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden mt-2">
+        <div class="bg-gradient-to-r from-emerald-950 via-emerald-900 to-teal-950 text-white p-4 flex flex-wrap items-center justify-between gap-3 border-b border-emerald-800/60">
+          <div class="flex items-center gap-3">
+            <span class="w-8 h-8 rounded-lg bg-emerald-800/80 border border-emerald-600/40 flex items-center justify-center text-emerald-300 font-extrabold text-sm shadow-xs">
+              🏆
+            </span>
+            <div>
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                Top 10 des Affaires Signées (Bordereaux Reçus)
+                <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  Majeures SCG-Ré
+                </span>
+              </h3>
+              <p class="text-xs text-emerald-200/80 mt-0.5">
+                Affaires fermes avec bordereaux reçus classées par Prime SCG-Ré strictement décroissante
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="badge-top10-signee-total" class="bg-white/10 text-emerald-100 text-xs px-3.5 py-1.5 rounded-full font-bold border border-white/20">
+              Cumul Top 10 : 0 FCFA
+            </span>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead class="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-700 border-b border-slate-200 select-none">
+              <tr>
+                <th class="py-3 px-3 font-bold w-12 text-center">Rang</th>
+                <th class="py-3 px-3 font-bold">Affaire</th>
+                <th class="py-3 px-3 font-bold">Cédante</th>
+                <th class="py-3 px-3 font-bold">Courtier / Apporteur</th>
+                <th class="py-3 px-3 font-bold text-right">Capitaux 100 %</th>
+                <th class="py-3 px-3 font-bold text-right">Prime 100 %</th>
+                <th class="py-3 px-3 font-bold text-right">Taux Cession</th>
+                <th class="py-3 px-3 font-bold text-right">Engagement SCG-Ré</th>
+                <th class="py-3 px-3 font-bold text-right text-emerald-700">Prime SCG-Ré</th>
+              </tr>
+            </thead>
+            <tbody id="table-signee-top10-body" class="divide-y divide-slate-100">
+              <!-- Rendu Dynamique JavaScript -->
+            </tbody>
+          </table>
+        </div>
       </div>
 
     </div>
@@ -709,6 +909,11 @@ html_template = """<!DOCTYPE html>
         <span><strong>Traitements 100% automatiques :</strong> standardisation des 11 branches, normalisation des pays, correction des apporteurs et regroupement des cédantes par Groupe d'assurance.</span>
       </div>
 
+      <div class="mt-2.5 p-3 bg-brand-50 rounded-xl border border-brand-200 text-[11px] text-brand-900 flex items-start gap-2">
+        <svg class="w-4 h-4 text-brand-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+        <span><strong>Mémorisation permanente :</strong> La base importée est automatiquement enregistrée dans votre navigateur. Au redémarrage ou en rouvrant le lien, <strong>vos nouvelles données restent actives par défaut</strong>. Vous pourrez rétablir la base initiale à tout moment.</span>
+      </div>
+
     </div>
   </div>
 
@@ -724,12 +929,50 @@ html_template = """<!DOCTYPE html>
     Chart.register(ChartDataLabels);
 
     // INITIAL EMBEDDED CLEANED DATA
+    /*__START_RECORDS__*/
     const INITIAL_RECORDS = __INITIAL_RECORDS__;
+    /*__END_RECORDS__*/
     const INITIAL_CLEANING_LOG = __INITIAL_CLEANING_LOG__;
+    const INITIAL_BUILD_TIMESTAMP = "__BUILD_TIMESTAMP__";
+
+    // PERSISTENCE STORAGE CONFIG
+    const DB_NAME = 'SCG_RE_ARO_DB';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'datasets';
+    const RECORD_KEY = 'latest_imported_dataset';
+    const LOCAL_STORAGE_KEY = 'SCG_RE_ARO_LATEST_DATA_V2';
 
     // ACTIVE STATE
     let allRecords = [...INITIAL_RECORDS];
     let cleaningLog = [...INITIAL_CLEANING_LOG];
+    let currentDatasetMeta = {
+      isCustom: false,
+      fileName: "Base d'origine SCG-Ré",
+      importDate: null,
+      importTimestamp: null,
+      recordCount: INITIAL_RECORDS.length
+    };
+
+    // Fast synchronous pre-load via localStorage (immediate zero-latency)
+    try {
+      const syncItem = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (syncItem) {
+        const parsed = JSON.parse(syncItem);
+        if (parsed && Array.isArray(parsed.records) && parsed.records.length > 0) {
+          allRecords = parsed.records;
+          currentDatasetMeta = {
+            isCustom: true,
+            fileName: parsed.fileName || 'Base personnalisée',
+            importDate: parsed.importDate || null,
+            importTimestamp: parsed.importTimestamp || null,
+            recordCount: parsed.records.length
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('Sync cache check:', e);
+    }
+
     let filteredRecords = [...allRecords];
     let currentTabId = 'tab-souscrite';
 
@@ -789,14 +1032,234 @@ html_template = """<!DOCTYPE html>
     }
 
     // ==========================================
+    // PERSISTENCE STORAGE ENGINE (IndexedDB + localStorage)
+    // ==========================================
+    function getIDB() {
+      return new Promise((resolve, reject) => {
+        if (!window.indexedDB) {
+          return reject(new Error('IndexedDB non supporté'));
+        }
+        const req = window.indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME);
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error || new Error('Erreur ouverture IDB'));
+      });
+    }
+
+    async function saveDatasetToStorage(datasetObj) {
+      // 1. Sauvegarde IndexedDB (capacité virtuellement illimitée)
+      try {
+        const db = await getIDB();
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          const store = tx.objectStore(STORE_NAME);
+          const req = store.put(datasetObj, RECORD_KEY);
+          req.onsuccess = () => resolve();
+          req.onerror = () => reject(req.error);
+        });
+      } catch (err) {
+        console.warn('IndexedDB write warning:', err);
+      }
+
+      // 2. Sauvegarde localStorage rapide
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(datasetObj));
+      } catch (err) {
+        console.warn('localStorage write warning (limite de quota possible):', err);
+      }
+    }
+
+    async function loadDatasetFromStorage() {
+      // 1. Essai IndexedDB en priorité
+      try {
+        const db = await getIDB();
+        const data = await new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, 'readonly');
+          const store = tx.objectStore(STORE_NAME);
+          const req = store.get(RECORD_KEY);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+        if (data && Array.isArray(data.records) && data.records.length > 0) {
+          return data;
+        }
+      } catch (err) {
+        console.warn('IndexedDB read warning:', err);
+      }
+
+      // 2. Repli localStorage
+      try {
+        const item = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (item) {
+          const parsed = JSON.parse(item);
+          if (parsed && Array.isArray(parsed.records) && parsed.records.length > 0) {
+            return parsed;
+          }
+        }
+      } catch (err) {
+        console.warn('localStorage read warning:', err);
+      }
+
+      return null;
+    }
+
+    async function clearDatasetFromStorage() {
+      try {
+        const db = await getIDB();
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          const store = tx.objectStore(STORE_NAME);
+          const req = store.delete(RECORD_KEY);
+          req.onsuccess = () => resolve();
+          req.onerror = () => reject(req.error);
+        });
+      } catch (err) {
+        console.warn('IndexedDB delete warning:', err);
+      }
+
+      try {
+        localStorage.removeItem(LOCAL_STORAGE_KEY);
+      } catch (err) {
+        console.warn('localStorage delete warning:', err);
+      }
+    }
+
+    function updateDatasetStatusUI() {
+      const statusName = document.getElementById('dataset-status-name');
+      const statusDetail = document.getElementById('dataset-status-detail');
+      const statusDot = document.getElementById('dataset-status-dot');
+      const btnReset = document.getElementById('btn-reset-dataset');
+      const btnDownloadHtml = document.getElementById('btn-download-html');
+      const headerCount = document.getElementById('header-records-count');
+
+      if (headerCount) {
+        headerCount.textContent = `${allRecords.length} affaires chargées`;
+      }
+
+      if (currentDatasetMeta.isCustom) {
+        if (statusName) {
+          statusName.textContent = currentDatasetMeta.fileName || 'Base personnalisée';
+          statusName.title = `Fichier : ${currentDatasetMeta.fileName || 'Inconnu'}\\nDate d'enregistrement : ${currentDatasetMeta.importDate || 'Récemment'}\\nAffaires : ${currentDatasetMeta.recordCount}`;
+        }
+        if (statusDetail) {
+          statusDetail.textContent = `(Enregistrée par défaut • ${currentDatasetMeta.recordCount} aff.)`;
+        }
+        if (statusDot) {
+          statusDot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+        }
+        if (btnReset) btnReset.classList.remove('hidden');
+        if (btnDownloadHtml) btnDownloadHtml.classList.remove('hidden');
+      } else {
+        if (statusName) {
+          statusName.textContent = "Base d'origine SCG-Ré";
+          statusName.title = "Données préchargées de base (498 affaires)";
+        }
+        if (statusDetail) {
+          statusDetail.textContent = `(${allRecords.length} affaires)`;
+        }
+        if (statusDot) {
+          statusDot.className = 'w-2 h-2 rounded-full bg-slate-400';
+        }
+        if (btnReset) btnReset.classList.add('hidden');
+        if (btnDownloadHtml) btnDownloadHtml.classList.add('hidden');
+      }
+    }
+
+    function setupStorageControls() {
+      const btnReset = document.getElementById('btn-reset-dataset');
+      if (btnReset) {
+        btnReset.addEventListener('click', async () => {
+          const confirmed = confirm("Voulez-vous rétablir la base de données d'origine de la SCG-Ré ?\\n\\nLa base importée sera supprimée de la mémoire locale et le tableau de bord utilisera à nouveau ses données d'origine.");
+          if (confirmed) {
+            await clearDatasetFromStorage();
+            allRecords = [...INITIAL_RECORDS];
+            filteredRecords = [...allRecords];
+            currentDatasetMeta = {
+              isCustom: false,
+              fileName: "Base d'origine SCG-Ré",
+              importDate: null,
+              importTimestamp: null,
+              recordCount: INITIAL_RECORDS.length
+            };
+            updateDatasetStatusUI();
+            populateFilterOptions();
+            document.getElementById('filter-branche').value = 'ALL';
+            applyFilters();
+            showToast("Base d'origine SCG-Ré rétablie avec succès !");
+          }
+        });
+      }
+
+      const btnDownload = document.getElementById('btn-download-html');
+      if (btnDownload) {
+        btnDownload.addEventListener('click', downloadStandaloneHtml);
+      }
+    }
+
+    function downloadStandaloneHtml() {
+      try {
+        let fullHtml = '<!DOCTYPE html>\\n' + document.documentElement.outerHTML;
+        const startMarker = '/*__START_RECORDS__*/';
+        const endMarker = '/*__END_RECORDS__*/';
+        const startIdx = fullHtml.indexOf(startMarker);
+        const endIdx = fullHtml.indexOf(endMarker);
+
+        if (startIdx !== -1 && endIdx !== -1) {
+          const before = fullHtml.substring(0, startIdx + startMarker.length);
+          const after = fullHtml.substring(endIdx);
+          fullHtml = before + '\\n    const INITIAL_RECORDS = ' + JSON.stringify(allRecords) + ';\\n    ' + after;
+        }
+
+        const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'index.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Fichier index.html autonome téléchargé !');
+      } catch (err) {
+        console.error('Erreur export HTML:', err);
+        alert('Erreur lors du téléchargement : ' + err.message);
+      }
+    }
+
+    // ==========================================
     // INITIALIZATION ON DOM READY
     // ==========================================
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Vérification asynchrone IndexedDB (au cas où les données y sont plus récentes/complètes)
+      try {
+        const idbData = await loadDatasetFromStorage();
+        if (idbData && Array.isArray(idbData.records) && idbData.records.length > 0) {
+          allRecords = idbData.records;
+          currentDatasetMeta = {
+            isCustom: true,
+            fileName: idbData.fileName || 'Base personnalisée',
+            importDate: idbData.importDate || null,
+            importTimestamp: idbData.importTimestamp || null,
+            recordCount: idbData.records.length
+          };
+          filteredRecords = [...allRecords];
+        }
+      } catch (err) {
+        console.warn('IDB load check:', err);
+      }
+
       setupTabs();
       setupFilters();
       setupUploadModal();
       setupTableControls();
       setupViewToggles();
+      setupStorageControls();
+      updateDatasetStatusUI();
       renderAll();
     });
 
@@ -804,119 +1267,125 @@ html_template = """<!DOCTYPE html>
     // TAB SWITCHING & DYNAMIC KPI CONTEXT
     // ==========================================
     function setupTabs() {
-      const tabBtns = document.querySelectorAll('.tab-btn');
-      tabBtns.forEach(btn => {
+      const tabDefs = [
+        { id: 'tab-btn-souscrite', target: 'tab-souscrite' },
+        { id: 'tab-btn-signee', target: 'tab-signee' },
+        { id: 'tab-btn-data', target: 'tab-data' }
+      ];
+
+      tabDefs.forEach(({ id, target }) => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
         btn.addEventListener('click', () => {
-          const targetTab = btn.getAttribute('data-tab');
-          currentTabId = targetTab;
-          
-          tabBtns.forEach(b => {
-            b.classList.remove('active', 'bg-brand-50', 'text-brand-700', 'border-brand-200/80');
-            b.classList.add('text-slate-600');
-          });
-          btn.classList.add('active', 'bg-brand-50', 'text-brand-700', 'border-brand-200/80');
-          btn.classList.remove('text-slate-600');
+          currentTabId = target;
+          updateTabStyles();
 
           document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-          const activeContent = document.getElementById(targetTab);
+          const activeContent = document.getElementById(target);
           if (activeContent) activeContent.classList.remove('hidden');
 
-          // Re-render KPIs according to current active tab
+          // Strict context isolation : re-render KPIs and filter status
           renderKPIs();
+          if (currentTabId === 'tab-signee') {
+            renderTop10AffairesSignees();
+          }
 
           // Resize active charts
           setTimeout(() => {
             Object.values(charts).forEach(c => {
               if (c && typeof c.resize === 'function') c.resize();
             });
-          }, 50);
+          }, 60);
         });
       });
+
+      updateTabStyles();
+    }
+
+    function updateTabStyles() {
+      const btnSouscrite = document.getElementById('tab-btn-souscrite');
+      const btnSignee = document.getElementById('tab-btn-signee');
+      const btnData = document.getElementById('tab-btn-data');
+
+      const badgeSouscrite = document.getElementById('badge-tab-souscrite');
+      const badgeSignee = document.getElementById('badge-tab-signee');
+      const badgeData = document.getElementById('badge-tab-data');
+
+      // Styles de base au repos
+      if (btnSouscrite) {
+        btnSouscrite.className = 'tab-btn px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-150 flex items-center gap-2 whitespace-nowrap';
+      }
+      // Onglet Prime signée : Vert émeraude subtil de base au repos
+      if (btnSignee) {
+        btnSignee.className = 'tab-btn px-4 py-2 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300/80 hover:bg-emerald-100 hover:border-emerald-400 transition-all duration-150 flex items-center gap-2 whitespace-nowrap shadow-2xs';
+      }
+      if (btnData) {
+        btnData.className = 'tab-btn px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-150 flex items-center gap-2 whitespace-nowrap';
+      }
+
+      if (badgeSouscrite) badgeSouscrite.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-200 text-slate-700 ml-1';
+      if (badgeSignee) badgeSignee.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-300/70 ml-1';
+      if (badgeData) badgeData.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-200 text-slate-700 ml-1';
+
+      if (currentTabId === 'tab-souscrite' && btnSouscrite) {
+        btnSouscrite.className = 'tab-btn active px-4 py-2 rounded-lg text-xs font-bold bg-brand-600 text-white shadow-sm shadow-brand-500/25 ring-1 ring-brand-700 transition-all duration-150 flex items-center gap-2 whitespace-nowrap';
+        if (badgeSouscrite) badgeSouscrite.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-white/20 text-white ml-1';
+      } else if (currentTabId === 'tab-signee' && btnSignee) {
+        // Devient Vert Intense plein avec ombre lumineuse lorsqu'il est actif
+        btnSignee.className = 'tab-btn active px-4 py-2 rounded-lg text-xs font-bold bg-emerald-600 text-white shadow-sm shadow-emerald-500/30 ring-1 ring-emerald-700 transition-all duration-150 flex items-center gap-2 whitespace-nowrap';
+        if (badgeSignee) badgeSignee.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-white/20 text-white ml-1';
+      } else if (currentTabId === 'tab-data' && btnData) {
+        btnData.className = 'tab-btn active px-4 py-2 rounded-lg text-xs font-bold bg-slate-800 text-white shadow-sm shadow-slate-700/25 ring-1 ring-slate-900 transition-all duration-150 flex items-center gap-2 whitespace-nowrap';
+        if (badgeData) badgeData.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-white/20 text-white ml-1';
+      }
     }
 
     // ==========================================
-    // TOGGLES GRAPHIQUE / TABLEAU POUR CÉDANTES & COURTIERS
+    // TOGGLES GRAPHIQUE / TABLEAU COMPLET POUR TOUS LES BLOCS
     // ==========================================
+    function bindChartTableToggle(chartBtnId, tableBtnId, chartViewId, tableViewId, chartKey) {
+      const chartBtn = document.getElementById(chartBtnId);
+      const tableBtn = document.getElementById(tableBtnId);
+      const chartView = document.getElementById(chartViewId);
+      const tableView = document.getElementById(tableViewId);
+      if (!chartBtn || !tableBtn || !chartView || !tableView) return;
+
+      chartBtn.addEventListener('click', () => {
+        chartBtn.className = 'px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all';
+        tableBtn.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all';
+        chartView.classList.remove('hidden');
+        tableView.classList.add('hidden');
+        if (chartKey && charts[chartKey] && typeof charts[chartKey].resize === 'function') {
+          charts[chartKey].resize();
+        }
+      });
+
+      tableBtn.addEventListener('click', () => {
+        tableBtn.className = 'px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all';
+        chartBtn.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all';
+        tableView.classList.remove('hidden');
+        chartView.classList.add('hidden');
+      });
+    }
+
     function setupViewToggles() {
-      // Souscrite Cédante
-      const btnSCChart = document.getElementById('btn-toggle-souscrite-cedante-chart');
-      const btnSCTable = document.getElementById('btn-toggle-souscrite-cedante-table');
-      const viewSCChart = document.getElementById('view-souscrite-cedante-chart');
-      const viewSCTable = document.getElementById('view-souscrite-cedante-table');
-      
-      btnSCChart.addEventListener('click', () => {
-        btnSCChart.className = 'px-2.5 py-1 rounded-md font-semibold bg-white text-slate-800 shadow-xs transition-all';
-        btnSCTable.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all';
-        viewSCChart.classList.remove('hidden');
-        viewSCTable.classList.add('hidden');
-        if (charts['chart-souscrite-cedante']) charts['chart-souscrite-cedante'].resize();
-      });
-      btnSCTable.addEventListener('click', () => {
-        btnSCTable.className = 'px-2.5 py-1 rounded-md font-semibold bg-white text-slate-800 shadow-xs transition-all';
-        btnSCChart.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all';
-        viewSCTable.classList.remove('hidden');
-        viewSCChart.classList.add('hidden');
-      });
+      // 1. Souscrite Branche
+      bindChartTableToggle('btn-toggle-souscrite-branche-chart', 'btn-toggle-souscrite-branche-table', 'view-souscrite-branche-chart', 'view-souscrite-branche-table', 'chart-souscrite-branche');
+      // 2. Souscrite Pays
+      bindChartTableToggle('btn-toggle-souscrite-pays-chart', 'btn-toggle-souscrite-pays-table', 'view-souscrite-pays-chart', 'view-souscrite-pays-table', 'chart-souscrite-pays');
+      // 3. Souscrite Cédante
+      bindChartTableToggle('btn-toggle-souscrite-cedante-chart', 'btn-toggle-souscrite-cedante-table', 'view-souscrite-cedante-chart', 'view-souscrite-cedante-table', 'chart-souscrite-cedante');
+      // 4. Souscrite Courtier
+      bindChartTableToggle('btn-toggle-souscrite-courtier-chart', 'btn-toggle-souscrite-courtier-table', 'view-souscrite-courtier-chart', 'view-souscrite-courtier-table', 'chart-souscrite-courtier');
 
-      // Souscrite Courtier
-      const btnSKChart = document.getElementById('btn-toggle-souscrite-courtier-chart');
-      const btnSKTable = document.getElementById('btn-toggle-souscrite-courtier-table');
-      const viewSKChart = document.getElementById('view-souscrite-courtier-chart');
-      const viewSKTable = document.getElementById('view-souscrite-courtier-table');
-
-      btnSKChart.addEventListener('click', () => {
-        btnSKChart.className = 'px-2.5 py-1 rounded-md font-semibold bg-white text-slate-800 shadow-xs transition-all';
-        btnSKTable.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all';
-        viewSKChart.classList.remove('hidden');
-        viewSKTable.classList.add('hidden');
-        if (charts['chart-souscrite-courtier']) charts['chart-souscrite-courtier'].resize();
-      });
-      btnSKTable.addEventListener('click', () => {
-        btnSKTable.className = 'px-2.5 py-1 rounded-md font-semibold bg-white text-slate-800 shadow-xs transition-all';
-        btnSKChart.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all';
-        viewSKTable.classList.remove('hidden');
-        viewSKChart.classList.add('hidden');
-      });
-
-      // Signée Cédante
-      const btnSgCChart = document.getElementById('btn-toggle-signee-cedante-chart');
-      const btnSgCTable = document.getElementById('btn-toggle-signee-cedante-table');
-      const viewSgCChart = document.getElementById('view-signee-cedante-chart');
-      const viewSgCTable = document.getElementById('view-signee-cedante-table');
-
-      btnSgCChart.addEventListener('click', () => {
-        btnSgCChart.className = 'px-2.5 py-1 rounded-md font-semibold bg-white text-slate-800 shadow-xs transition-all';
-        btnSgCTable.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all';
-        viewSgCChart.classList.remove('hidden');
-        viewSgCTable.classList.add('hidden');
-        if (charts['chart-signee-cedante']) charts['chart-signee-cedante'].resize();
-      });
-      btnSgCTable.addEventListener('click', () => {
-        btnSgCTable.className = 'px-2.5 py-1 rounded-md font-semibold bg-white text-slate-800 shadow-xs transition-all';
-        btnSgCChart.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all';
-        viewSgCTable.classList.remove('hidden');
-        viewSgCChart.classList.add('hidden');
-      });
-
-      // Signée Courtier
-      const btnSgKChart = document.getElementById('btn-toggle-signee-courtier-chart');
-      const btnSgKTable = document.getElementById('btn-toggle-signee-courtier-table');
-      const viewSgKChart = document.getElementById('view-signee-courtier-chart');
-      const viewSgKTable = document.getElementById('view-signee-courtier-table');
-
-      btnSgKChart.addEventListener('click', () => {
-        btnSgKChart.className = 'px-2.5 py-1 rounded-md font-semibold bg-white text-slate-800 shadow-xs transition-all';
-        btnSgKTable.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all';
-        viewSgKChart.classList.remove('hidden');
-        viewSgKTable.classList.add('hidden');
-        if (charts['chart-signee-courtier']) charts['chart-signee-courtier'].resize();
-      });
-      btnSgKTable.addEventListener('click', () => {
-        btnSgKTable.className = 'px-2.5 py-1 rounded-md font-semibold bg-white text-slate-800 shadow-xs transition-all';
-        btnSgKChart.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all';
-        viewSgKTable.classList.remove('hidden');
-        viewSgKChart.classList.add('hidden');
-      });
+      // 5. Signée Branche
+      bindChartTableToggle('btn-toggle-signee-branche-chart', 'btn-toggle-signee-branche-table', 'view-signee-branche-chart', 'view-signee-branche-table', 'chart-signee-branche');
+      // 6. Signée Pays
+      bindChartTableToggle('btn-toggle-signee-pays-chart', 'btn-toggle-signee-pays-table', 'view-signee-pays-chart', 'view-signee-pays-table', 'chart-signee-pays');
+      // 7. Signée Cédante
+      bindChartTableToggle('btn-toggle-signee-cedante-chart', 'btn-toggle-signee-cedante-table', 'view-signee-cedante-chart', 'view-signee-cedante-table', 'chart-signee-cedante');
+      // 8. Signée Courtier
+      bindChartTableToggle('btn-toggle-signee-courtier-chart', 'btn-toggle-signee-courtier-table', 'view-signee-courtier-chart', 'view-signee-courtier-table', 'chart-signee-courtier');
     }
 
     // ==========================================
@@ -971,10 +1440,29 @@ html_template = """<!DOCTYPE html>
       renderVueSouscrite();
       renderVueSignee();
       renderDataTable();
+      updateTabBadges();
+    }
+
+    function updateTabBadges() {
+      const signedCountAll = allRecords.filter(r => r.etatBordereau === 'REÇU').length;
+      const signedCountFiltered = filteredRecords.filter(r => r.etatBordereau === 'REÇU').length;
+
+      const badgeSouscrite = document.getElementById('badge-tab-souscrite');
+      if (badgeSouscrite) {
+        badgeSouscrite.textContent = filteredRecords.length + ' affaires';
+      }
+      const badgeSignee = document.getElementById('badge-tab-signee');
+      if (badgeSignee) {
+        badgeSignee.textContent = signedCountFiltered + ' bordereaux';
+      }
+      const badgeData = document.getElementById('badge-tab-data');
+      if (badgeData) {
+        badgeData.textContent = filteredRecords.length + ' polices';
+      }
     }
 
     // ==========================================
-    // 1. RENDER 5 PERMANENT KPIS (DYNAMIQUES PAR ONGLET)
+    // 1. RENDER 5 PERMANENT KPIS (ÉTANCHÉITÉ STRICTE PRIME SIGNÉE)
     // ==========================================
     function renderKPIs() {
       const isSigneeMode = (currentTabId === 'tab-signee');
@@ -994,9 +1482,9 @@ html_template = """<!DOCTYPE html>
       const avgCommRate = totalPrimesSCG > 0 ? (totalCommissions / totalPrimesSCG) : 0;
       const ratioNet = totalPrimesSCG > 0 ? (totalPrimesNettes / totalPrimesSCG) : 0;
 
-      // Update Card 1: Capitaux Totaux 100%
+      // Update Card 1: Capitaux
       document.getElementById('kpi-label-capitaux-100').textContent = isSigneeMode 
-        ? 'Capitaux Totaux 100% (Signés)' 
+        ? 'Capitaux Signés (100%)' 
         : 'Capitaux Totaux (100%)';
       document.getElementById('kpi-capitaux-100').textContent = formatFCFA(totalCapitaux100);
       document.getElementById('kpi-sub-capitaux-100').textContent = isSigneeMode 
@@ -1005,33 +1493,64 @@ html_template = """<!DOCTYPE html>
 
       // Update Card 2: Engagement SCG-Ré
       document.getElementById('kpi-label-capitaux-scg').textContent = isSigneeMode 
-        ? 'Engagement SCG-Ré (Signé)' 
+        ? 'Engagement Signé SCG-Ré' 
         : 'Engagement SCG-Ré';
       document.getElementById('kpi-capitaux-scg').textContent = formatFCFA(totalCapitauxSCG);
       document.getElementById('kpi-part-capitaux-scg').textContent = formatPercent(partCapitauxSCG);
 
       // Update Card 3: Prime SCG-Ré
       document.getElementById('kpi-label-primes-scg').textContent = isSigneeMode 
-        ? 'Prime SCG-Ré (Signée)' 
+        ? 'Prime Signée SCG-Ré' 
         : 'Prime SCG-Ré';
       document.getElementById('kpi-primes-scg').textContent = formatFCFA(totalPrimesSCG);
       document.getElementById('kpi-part-scg').textContent = formatPercent(partPrimesSCG);
 
+      // Label adaptatif sous la Prime SCG
+      const subPrimeLabel = document.getElementById('kpi-sub-primes-scg-label');
+      if (subPrimeLabel) {
+        subPrimeLabel.textContent = isSigneeMode ? 'Part du 100% signé :' : 'Part du 100% :';
+      }
+
       // Update Card 4: Commission
       document.getElementById('kpi-label-commissions').textContent = isSigneeMode 
-        ? 'Commission (Signée)' 
+        ? 'Commission Signée' 
         : 'Commission';
       document.getElementById('kpi-commissions').textContent = formatFCFA(totalCommissions);
       document.getElementById('kpi-taux-comm-moyen').textContent = formatPercent(avgCommRate);
 
       // Update Card 5: Prime Nette
       document.getElementById('kpi-label-primes-nettes').textContent = isSigneeMode 
-        ? 'Prime Nette (Signée)' 
+        ? 'Prime Nette Signée' 
         : 'Prime Nette';
       document.getElementById('kpi-primes-nettes').textContent = formatFCFA(totalPrimesNettes);
       document.getElementById('kpi-ratio-net').textContent = formatPercent(ratioNet);
 
+      // Mise à jour de la barre d'état du filtre (100% étanche pour Signée)
+      const filterStatusEl = document.getElementById('filter-status-text');
+      if (filterStatusEl) {
+        if (isSigneeMode) {
+          const totalSignedBase = allRecords.filter(r => r.etatBordereau === 'REÇU').length;
+          filterStatusEl.innerHTML = `Affichage de <span class="font-bold text-emerald-600">${activeSubset.length}</span> bordereaux reçus sur <span class="font-bold">${totalSignedBase}</span>`;
+        } else {
+          filterStatusEl.innerHTML = `Affichage de <span class="font-bold text-brand-600">${filteredRecords.length}</span> affaires sur <span class="font-bold">${allRecords.length}</span>`;
+        }
+      }
+
       document.getElementById('header-records-count').textContent = allRecords.length + ' affaires chargées';
+    }
+
+    // Helper d'agrégation retournant une liste d'objets { name, amount, count }
+    function aggregateBy(records, keyExtractor) {
+      const map = {};
+      records.forEach(r => {
+        const k = keyExtractor(r);
+        if (!map[k]) map[k] = { amount: 0, count: 0 };
+        map[k].amount += (r.primesSCG || 0);
+        map[k].count += 1;
+      });
+      return Object.entries(map)
+        .map(([name, data]) => ({ name, amount: data.amount, count: data.count }))
+        .sort((a, b) => b.amount - a.amount);
     }
 
     // ==========================================
@@ -1042,77 +1561,49 @@ html_template = """<!DOCTYPE html>
       const totalSouscrite = records.reduce((acc, r) => acc + (r.primesSCG || 0), 0);
       document.getElementById('badge-souscrite-total').textContent = 'Total : ' + formatFCFA(totalSouscrite);
 
-      // --- A. Prime souscrite par Branche (Ordre décroissant) ---
-      const brancheMap = {};
-      records.forEach(r => {
-        const b = r.branche || 'AUTRES';
-        brancheMap[b] = (brancheMap[b] || 0) + (r.primesSCG || 0);
-      });
-      const sortedBranches = Object.entries(brancheMap).sort((a, b) => b[1] - a[1]);
+      // --- A. Prime souscrite par Branche ---
+      const sortedBranches = aggregateBy(records, r => r.branche || 'AUTRES');
       document.getElementById('count-branches-souscrite').textContent = sortedBranches.length + ' branches';
-
       renderHorizontalBarChart('chart-souscrite-branche', {
-        labels: sortedBranches.map(x => x[0]),
-        values: sortedBranches.map(x => x[1]),
+        labels: sortedBranches.map(x => x.name),
+        values: sortedBranches.map(x => x.amount),
         color: '#0284c7',
         datasetLabel: 'Prime souscrite'
       });
+      renderRankedTable('table-souscrite-branche-body', sortedBranches, totalSouscrite, 'affaires', 'bg-brand-500');
 
-      // --- B. Prime souscrite par Pays (Ordre décroissant) ---
-      const paysMap = {};
-      records.forEach(r => {
-        const p = r.pays || 'NON DÉFINI';
-        paysMap[p] = (paysMap[p] || 0) + (r.primesSCG || 0);
-      });
-      const sortedPays = Object.entries(paysMap).sort((a, b) => b[1] - a[1]);
+      // --- B. Prime souscrite par Pays ---
+      const sortedPays = aggregateBy(records, r => r.pays || 'NON DÉFINI');
       document.getElementById('count-pays-souscrite').textContent = sortedPays.length + ' pays';
-
       renderHorizontalBarChart('chart-souscrite-pays', {
-        labels: sortedPays.map(x => x[0]),
-        values: sortedPays.map(x => x[1]),
+        labels: sortedPays.map(x => x.name),
+        values: sortedPays.map(x => x.amount),
         color: '#10b981',
         datasetLabel: 'Prime souscrite'
       });
+      renderRankedTable('table-souscrite-pays-body', sortedPays, totalSouscrite, 'affaires', 'bg-emerald-500');
 
       // --- C. Prime souscrite par Cédante (Groupes standardisés) ---
-      const cedanteMap = {};
-      records.forEach(r => {
-        const c = r.cedante || 'NON DÉFINI';
-        cedanteMap[c] = (cedanteMap[c] || 0) + (r.primesSCG || 0);
-      });
-      const sortedCedantes = Object.entries(cedanteMap).sort((a, b) => b[1] - a[1]);
-
-      // Top 10 pour le graphique
+      const sortedCedantes = aggregateBy(records, r => r.cedante || 'NON DÉFINI');
       const top10Cedantes = sortedCedantes.slice(0, 10);
       renderHorizontalBarChart('chart-souscrite-cedante', {
-        labels: top10Cedantes.map(x => x[0]),
-        values: top10Cedantes.map(x => x[1]),
+        labels: top10Cedantes.map(x => x.name),
+        values: top10Cedantes.map(x => x.amount),
         color: '#d97706',
         datasetLabel: 'Prime souscrite'
       });
-
-      // Tableau complet pour la bascule
-      renderRankedTable('table-souscrite-cedante-body', sortedCedantes, totalSouscrite);
+      renderRankedTable('table-souscrite-cedante-body', sortedCedantes, totalSouscrite, 'affaires', 'bg-amber-500');
 
       // --- D. Prime souscrite par Courtier / Apporteur ---
-      const courtierMap = {};
-      records.forEach(r => {
-        const a = r.apporteur || 'NON SPÉCIFIÉ';
-        courtierMap[a] = (courtierMap[a] || 0) + (r.primesSCG || 0);
-      });
-      const sortedCourtiers = Object.entries(courtierMap).sort((a, b) => b[1] - a[1]);
-
-      // Top 10 pour le graphique
+      const sortedCourtiers = aggregateBy(records, r => r.apporteur || 'NON SPÉCIFIÉ');
       const top10Courtiers = sortedCourtiers.slice(0, 10);
       renderHorizontalBarChart('chart-souscrite-courtier', {
-        labels: top10Courtiers.map(x => x[0]),
-        values: top10Courtiers.map(x => x[1]),
+        labels: top10Courtiers.map(x => x.name),
+        values: top10Courtiers.map(x => x.amount),
         color: '#6366f1',
         datasetLabel: 'Prime souscrite'
       });
-
-      // Tableau complet pour la bascule
-      renderRankedTable('table-souscrite-courtier-body', sortedCourtiers, totalSouscrite);
+      renderRankedTable('table-souscrite-courtier-body', sortedCourtiers, totalSouscrite, 'affaires', 'bg-indigo-500');
     }
 
     // ==========================================
@@ -1125,77 +1616,52 @@ html_template = """<!DOCTYPE html>
       document.getElementById('badge-signee-count').textContent = records.length + ' bordereaux reçus';
       document.getElementById('badge-signee-total').textContent = 'Total : ' + formatFCFA(totalSignee);
 
-      // --- A. Prime signée par Branche (Ordre décroissant) ---
-      const brancheMap = {};
-      records.forEach(r => {
-        const b = r.branche || 'AUTRES';
-        brancheMap[b] = (brancheMap[b] || 0) + (r.primesSCG || 0);
-      });
-      const sortedBranches = Object.entries(brancheMap).sort((a, b) => b[1] - a[1]);
+      // --- A. Prime signée par Branche ---
+      const sortedBranches = aggregateBy(records, r => r.branche || 'AUTRES');
       document.getElementById('count-branches-signee').textContent = sortedBranches.length + ' branches';
-
       renderHorizontalBarChart('chart-signee-branche', {
-        labels: sortedBranches.map(x => x[0]),
-        values: sortedBranches.map(x => x[1]),
+        labels: sortedBranches.map(x => x.name),
+        values: sortedBranches.map(x => x.amount),
         color: '#059669',
         datasetLabel: 'Prime signée'
       });
+      renderRankedTable('table-signee-branche-body', sortedBranches, totalSignee, 'bordereaux', 'bg-emerald-600');
 
-      // --- B. Prime signée par Pays (Ordre décroissant) ---
-      const paysMap = {};
-      records.forEach(r => {
-        const p = r.pays || 'NON DÉFINI';
-        paysMap[p] = (paysMap[p] || 0) + (r.primesSCG || 0);
-      });
-      const sortedPays = Object.entries(paysMap).sort((a, b) => b[1] - a[1]);
+      // --- B. Prime signée par Pays ---
+      const sortedPays = aggregateBy(records, r => r.pays || 'NON DÉFINI');
       document.getElementById('count-pays-signee').textContent = sortedPays.length + ' pays';
-
       renderHorizontalBarChart('chart-signee-pays', {
-        labels: sortedPays.map(x => x[0]),
-        values: sortedPays.map(x => x[1]),
+        labels: sortedPays.map(x => x.name),
+        values: sortedPays.map(x => x.amount),
         color: '#0d9488',
         datasetLabel: 'Prime signée'
       });
+      renderRankedTable('table-signee-pays-body', sortedPays, totalSignee, 'bordereaux', 'bg-teal-600');
 
       // --- C. Prime signée par Cédante (Groupes standardisés) ---
-      const cedanteMap = {};
-      records.forEach(r => {
-        const c = r.cedante || 'NON DÉFINI';
-        cedanteMap[c] = (cedanteMap[c] || 0) + (r.primesSCG || 0);
-      });
-      const sortedCedantes = Object.entries(cedanteMap).sort((a, b) => b[1] - a[1]);
-
-      // Top 10 pour le graphique
+      const sortedCedantes = aggregateBy(records, r => r.cedante || 'NON DÉFINI');
       const top10Cedantes = sortedCedantes.slice(0, 10);
       renderHorizontalBarChart('chart-signee-cedante', {
-        labels: top10Cedantes.map(x => x[0]),
-        values: top10Cedantes.map(x => x[1]),
+        labels: top10Cedantes.map(x => x.name),
+        values: top10Cedantes.map(x => x.amount),
         color: '#0891b2',
         datasetLabel: 'Prime signée'
       });
-
-      // Tableau complet pour la bascule
-      renderRankedTable('table-signee-cedante-body', sortedCedantes, totalSignee);
+      renderRankedTable('table-signee-cedante-body', sortedCedantes, totalSignee, 'bordereaux', 'bg-cyan-600');
 
       // --- D. Prime signée par Courtier / Apporteur ---
-      const courtierMap = {};
-      records.forEach(r => {
-        const a = r.apporteur || 'NON SPÉCIFIÉ';
-        courtierMap[a] = (courtierMap[a] || 0) + (r.primesSCG || 0);
-      });
-      const sortedCourtiers = Object.entries(courtierMap).sort((a, b) => b[1] - a[1]);
-
-      // Top 10 pour le graphique
+      const sortedCourtiers = aggregateBy(records, r => r.apporteur || 'NON SPÉCIFIÉ');
       const top10Courtiers = sortedCourtiers.slice(0, 10);
       renderHorizontalBarChart('chart-signee-courtier', {
-        labels: top10Courtiers.map(x => x[0]),
-        values: top10Courtiers.map(x => x[1]),
+        labels: top10Courtiers.map(x => x.name),
+        values: top10Courtiers.map(x => x.amount),
         color: '#10b981',
         datasetLabel: 'Prime signée'
       });
+      renderRankedTable('table-signee-courtier-body', sortedCourtiers, totalSignee, 'bordereaux', 'bg-emerald-600');
 
-      // Tableau complet pour la bascule
-      renderRankedTable('table-signee-courtier-body', sortedCourtiers, totalSignee);
+      // --- E. Top 10 des Affaires Signées ---
+      renderTop10AffairesSignees();
     }
 
     // ==========================================
@@ -1283,30 +1749,121 @@ html_template = """<!DOCTYPE html>
       });
     }
 
-    // Helper pour remplir les tableaux complets classés (Cédantes & Courtiers)
-    function renderRankedTable(tbodyId, sortedList, total) {
+    // Helper complet pour remplir les tableaux complets classés (Branche, Pays, Cédante, Courtier)
+    function renderRankedTable(tbodyId, sortedList, total, countLabel, colorClass) {
       const tbody = document.getElementById(tbodyId);
       if (!tbody) return;
 
-      if (sortedList.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-slate-400">Aucune donnée disponible</td></tr>';
+      if (!sortedList || sortedList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-slate-400 font-medium">Aucune donnée disponible</td></tr>';
         return;
       }
 
+      const safeTotal = total > 0 ? total : 1;
+
       tbody.innerHTML = sortedList.map((item, idx) => {
-        const part = total > 0 ? (item[1] / total) : 0;
+        const rank = idx + 1;
+        const part = item.amount / safeTotal;
         const partWidth = Math.min(100, Math.max(2, Math.round(part * 100)));
+
+        let rankBadge = `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-slate-500 font-bold text-xs">${rank}</span>`;
+        if (rank === 1) {
+          rankBadge = `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 font-extrabold text-xs shadow-xs">1</span>`;
+        } else if (rank === 2) {
+          rankBadge = `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-200 text-slate-700 border border-slate-300 font-extrabold text-xs shadow-xs">2</span>`;
+        } else if (rank === 3) {
+          rankBadge = `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-700/10 text-amber-900 border border-amber-600/30 font-extrabold text-xs shadow-xs">3</span>`;
+        }
+
+        const countText = `${item.count} ${item.count > 1 ? countLabel : countLabel.replace(/x$/, '')}`;
+
         return `
-          <tr class="hover:bg-slate-50 transition-colors">
-            <td class="py-2 px-2.5 font-bold text-center text-slate-500">${idx + 1}</td>
-            <td class="py-2 px-2.5 font-semibold text-slate-800">
-              <div class="truncate max-w-[220px]" title="${item[0]}">${item[0]}</div>
-              <div class="w-full bg-slate-100 rounded-full h-1 mt-1">
-                <div class="bg-brand-500 h-1 rounded-full" style="width: ${partWidth}%"></div>
+          <tr class="hover:bg-slate-50/80 transition-colors">
+            <td class="py-2.5 px-3 font-bold text-center">${rankBadge}</td>
+            <td class="py-2.5 px-3 font-semibold text-slate-800">
+              <div class="truncate max-w-[200px]" title="${item.name}">${item.name}</div>
+            </td>
+            <td class="py-2.5 px-3 font-extrabold text-right text-slate-900 whitespace-nowrap">${formatFCFA(item.amount)}</td>
+            <td class="py-2.5 px-3 text-center whitespace-nowrap">
+              <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200/60">${countText}</span>
+            </td>
+            <td class="py-2.5 px-3 text-right whitespace-nowrap font-bold text-slate-700">
+              <div class="flex items-center justify-end gap-2">
+                <span>${formatPercent(part)}</span>
+                <div class="w-12 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div class="${colorClass} h-1.5 rounded-full" style="width: ${partWidth}%"></div>
+                </div>
               </div>
             </td>
-            <td class="py-2 px-2.5 font-extrabold text-right text-slate-900 whitespace-nowrap">${formatFCFA(item[1])}</td>
-            <td class="py-2 px-2.5 font-semibold text-right text-slate-600 whitespace-nowrap">${formatPercent(part)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // ==========================================
+    // TOP 10 DES AFFAIRES SIGNÉES (BORDEREAUX REÇUS)
+    // ==========================================
+    function renderTop10AffairesSignees() {
+      const tbody = document.getElementById('table-signee-top10-body');
+      if (!tbody) return;
+
+      const signedRecs = filteredRecords.filter(r => r.etatBordereau === 'REÇU');
+      const top10 = [...signedRecs]
+        .sort((a, b) => (b.primesSCG || 0) - (a.primesSCG || 0))
+        .slice(0, 10);
+
+      const totalTop10 = top10.reduce((acc, r) => acc + (r.primesSCG || 0), 0);
+      const totalAllSignee = signedRecs.reduce((acc, r) => acc + (r.primesSCG || 0), 0);
+      const pctTop10 = totalAllSignee > 0 ? ((totalTop10 / totalAllSignee) * 100).toFixed(1) : 0;
+
+      const badgeTotal = document.getElementById('badge-top10-signee-total');
+      if (badgeTotal) {
+        badgeTotal.textContent = 'Cumul Top 10 : ' + formatFCFA(totalTop10) + ' (' + pctTop10 + '% des signées)';
+      }
+
+      if (top10.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="py-6 text-center text-slate-400 font-medium">Aucun bordereau reçu pour ce filtre.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = top10.map((r, idx) => {
+        const rank = idx + 1;
+        let rankBadge = `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-600 font-bold text-xs">${rank}</span>`;
+        if (rank === 1) {
+          rankBadge = `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-800 border border-amber-300 font-extrabold text-xs shadow-xs" title="1er rang">🥇 1</span>`;
+        } else if (rank === 2) {
+          rankBadge = `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-200 text-slate-800 border border-slate-300 font-extrabold text-xs shadow-xs" title="2e rang">🥈 2</span>`;
+        } else if (rank === 3) {
+          rankBadge = `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-700/10 text-amber-900 border border-amber-600/30 font-extrabold text-xs shadow-xs" title="3e rang">🥉 3</span>`;
+        }
+
+        const tauxCessionVal = (r.tauxCession && r.tauxCession > 0) 
+          ? (r.tauxCession > 1 ? r.tauxCession : r.tauxCession * 100).toFixed(2) + '%'
+          : (r.primes100 > 0 ? ((r.primesSCG / r.primes100) * 100).toFixed(2) + '%' : '-');
+
+        return `
+          <tr class="hover:bg-emerald-50/40 transition-colors">
+            <td class="py-3 px-3 text-center whitespace-nowrap">${rankBadge}</td>
+            <td class="py-3 px-3 font-bold text-slate-900">
+              <div class="truncate max-w-[260px]" title="${r.affaire || ''}">${r.affaire || 'NON SPÉCIFIÉ'}</div>
+              <div class="text-[10px] font-semibold text-slate-500 mt-0.5 flex items-center gap-1.5">
+                <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span>${r.branche || 'AUTRES'}</span>
+                <span>•</span>
+                <span>${r.pays || ''}</span>
+              </div>
+            </td>
+            <td class="py-3 px-3 font-medium text-slate-700">
+              <div class="truncate max-w-[170px]" title="${r.cedante || ''}">${r.cedante || 'NON SPÉCIFIÉ'}</div>
+            </td>
+            <td class="py-3 px-3 font-medium text-slate-700">
+              <div class="truncate max-w-[170px]" title="${r.apporteur || ''}">${r.apporteur || 'NON SPÉCIFIÉ'}</div>
+            </td>
+            <td class="py-3 px-3 font-semibold text-right text-slate-700 whitespace-nowrap">${formatFCFA(r.capitaux100 || 0)}</td>
+            <td class="py-3 px-3 font-semibold text-right text-slate-700 whitespace-nowrap">${formatFCFA(r.primes100 || 0)}</td>
+            <td class="py-3 px-3 font-bold text-right text-brand-700 whitespace-nowrap">${tauxCessionVal}</td>
+            <td class="py-3 px-3 font-semibold text-right text-purple-900 whitespace-nowrap">${formatFCFA(r.capitauxSCG || 0)}</td>
+            <td class="py-3 px-3 font-extrabold text-right text-emerald-700 text-sm whitespace-nowrap bg-emerald-50/60">${formatFCFA(r.primesSCG || 0)}</td>
           </tr>
         `;
       }).join('');
@@ -1610,7 +2167,7 @@ html_template = """<!DOCTYPE html>
 
     function processExcelFile(file) {
       const reader = new FileReader();
-      reader.onload = function(e) {
+      reader.onload = async function(e) {
         try {
           const data = new Uint8Array(e.target.result);
           const workbook = XLSX.read(data, { type: 'array', cellDates: true });
@@ -1755,12 +2312,38 @@ html_template = """<!DOCTYPE html>
 
           allRecords = newRecords;
           filteredRecords = [...allRecords];
+
+          const nowStr = new Date().toLocaleString('fr-FR');
+          const metaObj = {
+            records: allRecords,
+            fileName: file.name,
+            importDate: nowStr,
+            importTimestamp: Date.now(),
+            recordCount: allRecords.length
+          };
+
+          currentDatasetMeta = {
+            isCustom: true,
+            fileName: file.name,
+            importDate: nowStr,
+            importTimestamp: metaObj.importTimestamp,
+            recordCount: allRecords.length
+          };
+
+          // Sauvegarde automatique et persistante (IndexedDB + localStorage)
+          await saveDatasetToStorage(metaObj);
+
+          updateDatasetStatusUI();
           populateFilterOptions();
           document.getElementById('filter-branche').value = 'ALL';
           applyFilters();
 
+          // Réinitialiser le file input pour permettre la ré-importation du même fichier si modifié
+          const fileInp = document.getElementById('file-input');
+          if (fileInp) fileInp.value = '';
+
           document.getElementById('upload-modal').classList.add('hidden');
-          showToast(`Importation réussie : ${allRecords.length} affaires chargées et standardisées !`);
+          showToast(`Importation réussie : ${allRecords.length} affaires enregistrées par défaut !`);
         } catch (err) {
           console.error(err);
           alert("Erreur lors de l'analyse du fichier Excel : " + err.message);
@@ -1777,7 +2360,7 @@ html_template = """<!DOCTYPE html>
 # Replace logo source (base64 if available, fallback to logo_scg_re.png)
 logo_src = logo_b64 if logo_b64 else "logo_scg_re.png"
 
-final_html = html_template.replace('__INITIAL_RECORDS__', records_json).replace('__INITIAL_CLEANING_LOG__', log_json).replace('__LOGO_SRC__', logo_src)
+final_html = html_template.replace('__INITIAL_RECORDS__', records_json).replace('__INITIAL_CLEANING_LOG__', log_json).replace('__LOGO_SRC__', logo_src).replace('__BUILD_TIMESTAMP__', datetime.now().isoformat())
 
 with open('index.html', 'w', encoding='utf-8') as f:
     f.write(final_html)
