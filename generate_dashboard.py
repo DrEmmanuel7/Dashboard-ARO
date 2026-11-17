@@ -9,7 +9,15 @@ print("Starting dashboard generator...")
 with open('cleaned_records.json', 'r', encoding='utf-8') as f:
     payload = json.load(f)
 
-records_json = json.dumps(payload['records'], ensure_ascii=False)
+records_2026 = payload.get('records2026', [r for r in payload.get('records', []) if r.get('exercice') == 2026])
+records_2025 = payload.get('records2025', [r for r in payload.get('records', []) if r.get('exercice') == 2025])
+
+# Fallback if records2026 is empty
+if not records_2026 and payload.get('records'):
+    records_2026 = payload.get('records')
+
+records_2026_json = json.dumps(records_2026, ensure_ascii=False)
+records_2025_json = json.dumps(records_2025, ensure_ascii=False)
 log_json = json.dumps(payload.get('cleaning_log', []), ensure_ascii=False)
 
 # Read logo if exists for base64 embed
@@ -23,7 +31,7 @@ html_template = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SCG-Ré | Tableau de Bord ARO</title>
+  <title>SCG-Ré | Tableau de Bord Production ARO</title>
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -36,33 +44,37 @@ html_template = """<!DOCTYPE html>
             brand: {
               50: '#f0f7ff',
               100: '#e0effe',
-              200: '#bae0fd',
-              500: '#0284c7',
-              600: '#0369a1',
-              700: '#075985',
-              800: '#0c4a6e',
-              900: '#082f49',
-              950: '#041e33',
-            },
-            emerald: {
-              500: '#10b981',
-              600: '#059669',
-              700: '#047857',
+              200: '#b9ddfd',
+              300: '#7cc2fb',
+              400: '#36a3f7',
+              500: '#0c87eb',
+              600: '#006bc9',
+              700: '#0155a3',
+              800: '#054886',
+              900: '#0a3d6f',
+              950: '#07264a',
             }
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
           }
         }
       }
     }
   </script>
 
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
   <!-- Chart.js & Plugins -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-  <!-- SheetJS (xlsx) for instant client-side Excel parse & export -->
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+  <!-- SheetJS pour export et import Excel direct -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
     body {
       font-family: 'Plus Jakarta Sans', sans-serif;
     }
@@ -72,6 +84,7 @@ html_template = """<!DOCTYPE html>
     }
     .custom-scrollbar::-webkit-scrollbar-track {
       background: #f1f5f9;
+      border-radius: 4px;
     }
     .custom-scrollbar::-webkit-scrollbar-thumb {
       background: #cbd5e1;
@@ -83,72 +96,64 @@ html_template = """<!DOCTYPE html>
     @media print {
       .no-print { display: none !important; }
       body { background: white !important; }
-      .shadow-sm, .shadow-md, .shadow-lg { box-shadow: none !important; border: 1px solid #e2e8f0; }
+      .shadow-xs, .shadow-sm, .shadow-md, .shadow-lg { box-shadow: none !important; }
+      .border { border-color: #e2e8f0 !important; }
     }
   </style>
 </head>
-<body class="h-full flex flex-col text-slate-800 antialiased selection:bg-brand-500 selection:text-white">
+<body class="h-full flex flex-col bg-slate-50 text-slate-800 antialiased selection:bg-brand-500 selection:text-white">
 
-  <!-- TOP HEADER (PLEINE LARGEUR AVEC LOGO OFFICIEL SCG-RÉ) -->
-  <header class="bg-gradient-to-r from-brand-950 via-brand-900 to-slate-900 text-white shadow-lg sticky top-0 z-40 border-b border-brand-800/50">
+  <!-- TOP HEADER (PLEINE LARGEUR) -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs no-print">
     <div class="w-full px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
       
       <!-- Brand & Title -->
-      <div class="flex items-center space-x-3.5">
-        <div class="h-12 px-2.5 bg-white rounded-xl shadow-md ring-2 ring-white/20 flex items-center justify-center">
-          <img src="__LOGO_SRC__" alt="SCG-Ré" class="h-9 w-auto object-contain" />
+      <div class="flex items-center gap-3">
+        <div class="h-11 w-11 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center shadow-xs overflow-hidden shrink-0">
+          <img src="__LOGO_SRC__" alt="SCG-Ré" class="h-full w-full object-contain" onerror="this.onerror=null; this.src='https://placehold.co/100x100/0284c7/ffffff?text=SCG-R%C3%A9'">
         </div>
         <div>
           <div class="flex items-center gap-2">
-            <h1 class="text-xl font-extrabold tracking-tight text-white flex items-center gap-2.5">
-              Tableau de Bord ARO
-              <span class="text-xs font-semibold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-500/30">Cessions FAC</span>
-            </h1>
-          </div>
-          <p class="text-xs text-brand-200/80 font-medium flex items-center gap-2 mt-0.5">
-            <span>SCG-Ré</span>
-            <span>•</span>
-            <span id="header-records-count">498 affaires chargées</span>
-            <span>•</span>
-            <span class="text-emerald-400 font-semibold flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Données Standardisées
+            <h1 class="text-lg font-extrabold tracking-tight text-slate-900">SCG-Ré</h1>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-brand-100 text-brand-800 border border-brand-200">
+              FAC ARO 2026
             </span>
+          </div>
+          <p class="text-xs text-slate-500 font-medium">
+            Tableau de Bord Exécutif — Souscriptions & Cessions Commerciales
           </p>
         </div>
       </div>
 
-      <!-- Action Buttons & Database Status Indicator -->
-      <div class="flex items-center gap-2.5 no-print">
-        <!-- Active Database Status Indicator -->
-        <div id="dataset-status-pill" class="flex items-center gap-2 bg-brand-900/90 px-3.5 py-1.5 rounded-xl border border-brand-700/60 shadow-xs text-xs backdrop-blur-sm">
-          <span id="dataset-status-dot" class="w-2.5 h-2.5 rounded-full bg-slate-400 ring-2 ring-white/20"></span>
-          <span class="text-brand-300 font-medium text-[11px]">Base :</span>
-          <span id="dataset-status-name" class="font-bold text-white max-w-[170px] truncate" title="Base d'origine SCG-Ré">Base d'origine</span>
-          <span id="dataset-status-detail" class="text-brand-200/70 text-[10px] hidden md:inline">(498 affaires)</span>
-          <button id="btn-reset-dataset" title="Rétablir la base de données d'origine de la SCG-Ré" class="hidden text-amber-300 hover:text-amber-100 text-[11px] font-semibold flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 ml-1 transition-all">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-            Rétablir
-          </button>
+      <!-- Action Buttons & Dataset status -->
+      <div class="flex items-center gap-2.5 flex-wrap">
+        
+        <!-- Live Dataset Badge -->
+        <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-xs">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span class="text-slate-600 font-medium" id="header-records-count">Chargement...</span>
         </div>
 
-        <button id="btn-open-upload" class="inline-flex items-center gap-2 px-3.5 py-1.5 bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-500 hover:to-brand-600 text-white rounded-xl text-xs font-semibold shadow-xs hover:shadow transition-all duration-150 border border-brand-400/30 active:scale-95">
-          <svg class="w-4 h-4 text-brand-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-          Importer Nouveau Fichier Excel
+        <!-- Bouton Sauvegarde & Télécharger HTML à jour -->
+        <button id="btn-download-html" title="Télécharger le fichier index.html avec vos données intégrées" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100 hover:border-emerald-400 transition-all shadow-2xs">
+          <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          <span class="hidden sm:inline">Télécharger HTML à jour</span>
         </button>
 
-        <button id="btn-download-html" title="Télécharger le fichier index.html autonome avec ces nouvelles données" class="hidden inline-flex items-center gap-2 px-3.5 py-1.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-xl text-xs font-semibold shadow-xs hover:shadow transition-all duration-150 border border-indigo-400/30 active:scale-95">
-          <svg class="w-4 h-4 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
-          Télécharger HTML à jour
+        <!-- Bouton Importer Fichier Excel -->
+        <button id="btn-open-upload" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-brand-600 text-white hover:bg-brand-700 active:scale-95 transition-all shadow-xs">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+          <span>Importer Excel</span>
         </button>
 
-        <button id="btn-export-cleaned" class="inline-flex items-center gap-2 px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-xl text-xs font-semibold shadow-xs hover:shadow transition-all duration-150 border border-emerald-400/30 active:scale-95">
-          <svg class="w-4 h-4 text-emerald-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          Exporter Excel Propre
+        <!-- Bouton Rétablir Données d'origine -->
+        <button id="btn-reset-storage" title="Rétablir les données d'origine pré-intégrées" class="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
         </button>
 
-        <button onclick="window.print()" class="inline-flex items-center gap-2 px-3.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-semibold border border-slate-700 shadow-xs transition-all duration-150 active:scale-95">
-          <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-          Imprimer / PDF
+        <!-- Bouton Imprimer / PDF -->
+        <button onclick="window.print()" class="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200 transition-all" title="Imprimer ou Exporter en PDF">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
         </button>
       </div>
 
@@ -156,35 +161,33 @@ html_template = """<!DOCTYPE html>
   </header>
 
   <!-- STICKY FILTER BAR (PLEINE LARGEUR - FILTRE UNIQUE BRANCHE) -->
-  <section class="bg-white border-b border-slate-200/90 shadow-xs sticky top-[65px] z-30 no-print">
-    <div class="w-full px-4 sm:px-6 lg:px-8 py-3">
-      <div class="flex flex-wrap items-center justify-between gap-4">
-        
-        <!-- Filter Unique: Branche -->
-        <div class="flex items-center gap-3 flex-1 max-w-md">
-          <label for="filter-branche" class="text-xs font-bold uppercase tracking-wider text-slate-600 whitespace-nowrap flex items-center gap-1.5">
-            <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+  <section class="bg-white border-b border-slate-200/90 py-2.5 px-4 sm:px-6 lg:px-8 shadow-xs sticky top-[57px] z-30 no-print">
+    <div class="w-full flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Filtre Unique Branche -->
+      <div class="flex items-center gap-3 flex-wrap">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-brand-500"></span>
+          <label for="filter-branche" class="text-xs font-bold text-slate-700 uppercase tracking-wider">
             Filtrer par Branche :
           </label>
-          <select id="filter-branche" class="w-full bg-slate-50 border border-slate-300 text-slate-700 text-xs font-medium rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors shadow-xs">
-            <option value="ALL">Toutes les branches</option>
+        </div>
+        <div class="relative min-w-[240px]">
+          <select id="filter-branche" class="w-full pl-3 pr-8 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 focus:bg-white transition-all cursor-pointer">
+            <option value="">Toutes les branches (Global)</option>
           </select>
-          <button id="btn-reset-filters" title="Réinitialiser le filtre" class="inline-flex items-center justify-center p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg border border-slate-300 shadow-xs transition-all active:scale-90">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-          </button>
         </div>
-
-        <!-- Active filter status pill & Monnaie -->
-        <div class="flex items-center gap-4 text-xs text-slate-500">
-          <div id="filter-status-text" class="font-medium text-slate-600 bg-slate-100 px-3.5 py-1.5 rounded-full border border-slate-200/80 shadow-xs">
-            Affichage de <span class="font-bold text-brand-600" id="filtered-count">0</span> affaires sur <span class="font-bold" id="total-count-badge">0</span>
-          </div>
-          <div class="text-[11px] text-slate-400 font-medium">
-            Monnaie de référence : <strong class="text-slate-700 font-semibold">FCFA (XOF)</strong>
-          </div>
-        </div>
-
+        <button id="btn-reset-filters" title="Réinitialiser le filtre" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-all">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          <span>Effacer le filtre</span>
+        </button>
       </div>
+
+      <!-- Compteur dynamique en direct -->
+      <div class="text-xs font-medium text-slate-500 flex items-center gap-2">
+        <span id="filter-status-text">Affichage de <span class="font-bold text-brand-600">518</span> affaires sur <span class="font-bold">518</span></span>
+      </div>
+
     </div>
   </section>
 
@@ -198,23 +201,32 @@ html_template = """<!DOCTYPE html>
           <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
           <span>1. Vue Prime souscrite</span>
           <span id="badge-tab-souscrite" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-white/20 text-white ml-1">
-            498 affaires
+            0 affaires
           </span>
         </button>
 
-        <!-- Tab 2: Signée (Bouton Vert de base distinctif) -->
+        <!-- Tab 2: Signée -->
         <button data-tab="tab-signee" id="tab-btn-signee" class="tab-btn px-4 py-2 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300/80 hover:bg-emerald-100 hover:border-emerald-400 transition-all duration-200 flex items-center gap-2 whitespace-nowrap shadow-2xs">
           <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
           <span>2. Vue Prime signée (Bordereaux reçus)</span>
           <span id="badge-tab-signee" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-300/70 ml-1">
-            133 bordereaux
+            0 bordereaux
           </span>
         </button>
 
-        <!-- Tab 3: Explorateur -->
+        <!-- Tab 3: Affaires Sans Suite (NOUVEAU) -->
+        <button data-tab="tab-sans-suite" id="tab-btn-sans-suite" class="tab-btn px-4 py-2 rounded-lg text-xs font-bold bg-rose-50 text-rose-800 border border-rose-300/80 hover:bg-rose-100 hover:border-rose-400 transition-all duration-200 flex items-center gap-2 whitespace-nowrap shadow-2xs">
+          <svg class="w-4 h-4 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+          <span>3. Affaires Sans Suite</span>
+          <span id="badge-tab-sans-suite" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-rose-100 text-rose-800 border border-rose-300/70 ml-1">
+            0 sans suite
+          </span>
+        </button>
+
+        <!-- Tab 4: Explorateur -->
         <button data-tab="tab-data" id="tab-btn-data" class="tab-btn px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all duration-200 flex items-center gap-2 whitespace-nowrap">
           <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 4h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-          <span>3. Explorateur de Données & Export</span>
+          <span>4. Explorateur de Données & Export</span>
           <span id="badge-tab-data" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-200 text-slate-700 ml-1">
             Tableau
           </span>
@@ -228,7 +240,7 @@ html_template = """<!DOCTYPE html>
   <main class="flex-1 w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
     <!-- 5 PERMANENT KPI CARDS RIBBON -->
-    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+    <section id="ribbon-permanent-kpis" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
       
       <!-- KPI 1: Capitaux Totaux 100% -->
       <div class="bg-white rounded-xl border border-slate-200/90 p-4 shadow-xs relative overflow-hidden group hover:border-indigo-300 transition-all">
@@ -242,6 +254,11 @@ html_template = """<!DOCTYPE html>
         <div class="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
           <span>Assiette globale :</span>
           <span class="font-bold text-indigo-600" id="kpi-sub-capitaux-100">100% Marché</span>
+        </div>
+        <!-- Comparatif Subline 2025 -->
+        <div id="kpi-comp-capitaux-100" class="hidden mt-1.5 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+          <span class="text-slate-500">2025 : <strong id="kpi-comp-val-capitaux-100" class="text-slate-700">0 FCFA</strong></span>
+          <span id="kpi-comp-badge-capitaux-100">0%</span>
         </div>
         <div class="absolute bottom-0 left-0 right-0 h-1 bg-indigo-500"></div>
       </div>
@@ -259,6 +276,11 @@ html_template = """<!DOCTYPE html>
           <span>Part des capitaux :</span>
           <span class="font-bold text-purple-600" id="kpi-part-capitaux-scg">0%</span>
         </div>
+        <!-- Comparatif Subline 2025 -->
+        <div id="kpi-comp-capitaux-scg" class="hidden mt-1.5 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+          <span class="text-slate-500">2025 : <strong id="kpi-comp-val-capitaux-scg" class="text-slate-700">0 FCFA</strong></span>
+          <span id="kpi-comp-badge-capitaux-scg">0%</span>
+        </div>
         <div class="absolute bottom-0 left-0 right-0 h-1 bg-purple-500"></div>
       </div>
 
@@ -274,6 +296,11 @@ html_template = """<!DOCTYPE html>
         <div class="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
           <span id="kpi-sub-primes-scg-label">Part du 100% :</span>
           <span class="font-bold text-brand-600" id="kpi-part-scg">0%</span>
+        </div>
+        <!-- Comparatif Subline 2025 -->
+        <div id="kpi-comp-primes-scg" class="hidden mt-1.5 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+          <span class="text-slate-500">2025 : <strong id="kpi-comp-val-primes-scg" class="text-slate-700">0 FCFA</strong></span>
+          <span id="kpi-comp-badge-primes-scg">0%</span>
         </div>
         <div class="absolute bottom-0 left-0 right-0 h-1 bg-brand-500"></div>
       </div>
@@ -291,6 +318,11 @@ html_template = """<!DOCTYPE html>
           <span>Taux moyen :</span>
           <span class="font-bold text-amber-700" id="kpi-taux-comm-moyen">0%</span>
         </div>
+        <!-- Comparatif Subline 2025 -->
+        <div id="kpi-comp-commissions" class="hidden mt-1.5 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+          <span class="text-slate-500">2025 : <strong id="kpi-comp-val-commissions" class="text-slate-700">0 FCFA</strong></span>
+          <span id="kpi-comp-badge-commissions">0%</span>
+        </div>
         <div class="absolute bottom-0 left-0 right-0 h-1 bg-amber-500"></div>
       </div>
 
@@ -306,6 +338,11 @@ html_template = """<!DOCTYPE html>
         <div class="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
           <span>Net / Brut SCG :</span>
           <span class="font-bold text-emerald-600" id="kpi-ratio-net">0%</span>
+        </div>
+        <!-- Comparatif Subline 2025 -->
+        <div id="kpi-comp-primes-nettes" class="hidden mt-1.5 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+          <span class="text-slate-500">2025 : <strong id="kpi-comp-val-primes-nettes" class="text-slate-700">0 FCFA</strong></span>
+          <span id="kpi-comp-badge-primes-nettes">0%</span>
         </div>
         <div class="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500"></div>
       </div>
@@ -358,25 +395,22 @@ html_template = """<!DOCTYPE html>
               </div>
             </div>
           </div>
-          <!-- Vue Graphique -->
-          <div id="view-souscrite-branche-chart" class="h-80 relative flex-1">
+          
+          <div id="view-souscrite-branche-chart" class="h-80 w-full relative">
             <canvas id="chart-souscrite-branche"></canvas>
           </div>
-          <!-- Vue Tableau Complet -->
-          <div id="view-souscrite-branche-table" class="hidden flex-1 overflow-y-auto custom-scrollbar max-h-80">
-            <table class="w-full text-left text-xs border-collapse">
-              <thead class="bg-slate-50 sticky top-0 text-[11px] uppercase tracking-wider text-slate-600 border-b border-slate-200">
+          <div id="view-souscrite-branche-table" class="h-80 w-full overflow-y-auto custom-scrollbar hidden">
+            <table class="w-full text-xs text-left border-collapse">
+              <thead class="sticky top-0 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200 text-slate-600 font-bold z-10">
                 <tr>
-                  <th class="py-2.5 px-3 font-bold w-12 text-center">Rang</th>
-                  <th class="py-2.5 px-3 font-bold">Branche</th>
-                  <th class="py-2.5 px-3 font-bold text-right">Prime Souscrite</th>
-                  <th class="py-2.5 px-3 font-bold text-center w-24">Affaires</th>
-                  <th class="py-2.5 px-3 font-bold text-right w-28">Part %</th>
+                  <th class="py-2 px-3 text-center w-12">Rang</th>
+                  <th class="py-2 px-3">Branche</th>
+                  <th class="py-2 px-3 text-right">Prime SCG-Ré</th>
+                  <th class="py-2 px-3 text-center">Affaires</th>
+                  <th class="py-2 px-3 text-right">Part (%)</th>
                 </tr>
               </thead>
-              <tbody id="table-souscrite-branche-body" class="divide-y divide-slate-100">
-                <!-- Rendu Dynamique -->
-              </tbody>
+              <tbody id="table-souscrite-branche-body" class="divide-y divide-slate-100 font-medium"></tbody>
             </table>
           </div>
         </div>
@@ -392,7 +426,7 @@ html_template = """<!DOCTYPE html>
               <p class="text-[11px] text-slate-500">Lieu du risque — Classé par ordre décroissant (FCFA)</p>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200" id="count-pays-souscrite">0 pays</span>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200" id="count-pays-souscrite">Pays</span>
               <!-- Toggle Graphique / Tableau -->
               <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
                 <button id="btn-toggle-souscrite-pays-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
@@ -404,120 +438,113 @@ html_template = """<!DOCTYPE html>
               </div>
             </div>
           </div>
-          <!-- Vue Graphique -->
-          <div id="view-souscrite-pays-chart" class="h-80 relative flex-1">
+          
+          <div id="view-souscrite-pays-chart" class="h-80 w-full relative">
             <canvas id="chart-souscrite-pays"></canvas>
           </div>
-          <!-- Vue Tableau Complet -->
-          <div id="view-souscrite-pays-table" class="hidden flex-1 overflow-y-auto custom-scrollbar max-h-80">
-            <table class="w-full text-left text-xs border-collapse">
-              <thead class="bg-slate-50 sticky top-0 text-[11px] uppercase tracking-wider text-slate-600 border-b border-slate-200">
+          <div id="view-souscrite-pays-table" class="h-80 w-full overflow-y-auto custom-scrollbar hidden">
+            <table class="w-full text-xs text-left border-collapse">
+              <thead class="sticky top-0 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200 text-slate-600 font-bold z-10">
                 <tr>
-                  <th class="py-2.5 px-3 font-bold w-12 text-center">Rang</th>
-                  <th class="py-2.5 px-3 font-bold">Pays</th>
-                  <th class="py-2.5 px-3 font-bold text-right">Prime Souscrite</th>
-                  <th class="py-2.5 px-3 font-bold text-center w-24">Affaires</th>
-                  <th class="py-2.5 px-3 font-bold text-right w-28">Part %</th>
+                  <th class="py-2 px-3 text-center w-12">Rang</th>
+                  <th class="py-2 px-3">Pays</th>
+                  <th class="py-2 px-3 text-right">Prime SCG-Ré</th>
+                  <th class="py-2 px-3 text-center">Affaires</th>
+                  <th class="py-2 px-3 text-right">Part (%)</th>
                 </tr>
               </thead>
-              <tbody id="table-souscrite-pays-body" class="divide-y divide-slate-100">
-                <!-- Rendu Dynamique -->
-              </tbody>
+              <tbody id="table-souscrite-pays-body" class="divide-y divide-slate-100 font-medium"></tbody>
             </table>
           </div>
         </div>
 
       </div>
 
-      <!-- 2x2 Grid : Cédante & Courtier (avec Bascule Graphique / Tableau Complet) -->
+      <!-- 2x2 Grid : Cédantes & Courtiers (avec Bascule Graphique / Tableau Complet) -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         <!-- Bloc 3: Prime souscrite par Cédante -->
         <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col">
-          <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+          <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
             <div>
               <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
                 <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-                Prime souscrite par Cédante (Groupes standardisés)
+                Prime souscrite par Cédante (Groupe)
               </h3>
-              <p class="text-[11px] text-slate-500">Classée par ordre décroissant (FCFA)</p>
+              <p class="text-[11px] text-slate-500">Groupes d'assurances consolidés — Ordre décroissant</p>
             </div>
-            <!-- Toggle Graphique / Tableau -->
-            <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
-              <button id="btn-toggle-souscrite-cedante-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
-                Graphique Top 10
-              </button>
-              <button id="btn-toggle-souscrite-cedante-table" class="px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
-                Tableau Complet
-              </button>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200" id="count-cedantes-souscrite">Cédantes</span>
+              <!-- Toggle Graphique / Tableau -->
+              <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
+                <button id="btn-toggle-souscrite-cedante-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
+                  Graphique Top 10
+                </button>
+                <button id="btn-toggle-souscrite-cedante-table" class="px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
+                  Tableau Complet
+                </button>
+              </div>
             </div>
           </div>
-
-          <!-- Vue Graphique -->
-          <div id="view-souscrite-cedante-chart" class="h-80 relative flex-1">
+          
+          <div id="view-souscrite-cedante-chart" class="h-80 w-full relative">
             <canvas id="chart-souscrite-cedante"></canvas>
           </div>
-
-          <!-- Vue Tableau Complet -->
-          <div id="view-souscrite-cedante-table" class="hidden flex-1 overflow-y-auto custom-scrollbar max-h-80">
-            <table class="w-full text-left text-xs border-collapse">
-              <thead class="bg-slate-50 sticky top-0 text-[11px] uppercase tracking-wider text-slate-600 border-b border-slate-200">
+          <div id="view-souscrite-cedante-table" class="h-80 w-full overflow-y-auto custom-scrollbar hidden">
+            <table class="w-full text-xs text-left border-collapse">
+              <thead class="sticky top-0 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200 text-slate-600 font-bold z-10">
                 <tr>
-                  <th class="py-2.5 px-3 font-bold w-12 text-center">Rang</th>
-                  <th class="py-2.5 px-3 font-bold">Cédante (Groupe)</th>
-                  <th class="py-2.5 px-3 font-bold text-right">Prime SCG-Ré</th>
-                  <th class="py-2.5 px-3 font-bold text-center w-24">Affaires</th>
-                  <th class="py-2.5 px-3 font-bold text-right w-28">Part %</th>
+                  <th class="py-2 px-3 text-center w-12">Rang</th>
+                  <th class="py-2 px-3">Cédante (Groupe)</th>
+                  <th class="py-2 px-3 text-right">Prime SCG-Ré</th>
+                  <th class="py-2 px-3 text-center">Affaires</th>
+                  <th class="py-2 px-3 text-right">Part (%)</th>
                 </tr>
               </thead>
-              <tbody id="table-souscrite-cedante-body" class="divide-y divide-slate-100">
-                <!-- Rendu Dynamique -->
-              </tbody>
+              <tbody id="table-souscrite-cedante-body" class="divide-y divide-slate-100 font-medium"></tbody>
             </table>
           </div>
         </div>
 
         <!-- Bloc 4: Prime souscrite par Courtier -->
         <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col">
-          <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+          <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
             <div>
               <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
                 <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
                 Prime souscrite par Courtier / Apporteur
               </h3>
-              <p class="text-[11px] text-slate-500">Apporteurs standardisés — Ordre décroissant (FCFA)</p>
+              <p class="text-[11px] text-slate-500">Apporteurs standardisés — Ordre décroissant</p>
             </div>
-            <!-- Toggle Graphique / Tableau -->
-            <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
-              <button id="btn-toggle-souscrite-courtier-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
-                Graphique Top 10
-              </button>
-              <button id="btn-toggle-souscrite-courtier-table" class="px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
-                Tableau Complet
-              </button>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200" id="count-courtiers-souscrite">Courtiers</span>
+              <!-- Toggle Graphique / Tableau -->
+              <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
+                <button id="btn-toggle-souscrite-courtier-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
+                  Graphique Top 10
+                </button>
+                <button id="btn-toggle-souscrite-courtier-table" class="px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
+                  Tableau Complet
+                </button>
+              </div>
             </div>
           </div>
-
-          <!-- Vue Graphique -->
-          <div id="view-souscrite-courtier-chart" class="h-80 relative flex-1">
+          
+          <div id="view-souscrite-courtier-chart" class="h-80 w-full relative">
             <canvas id="chart-souscrite-courtier"></canvas>
           </div>
-
-          <!-- Vue Tableau Complet -->
-          <div id="view-souscrite-courtier-table" class="hidden flex-1 overflow-y-auto custom-scrollbar max-h-80">
-            <table class="w-full text-left text-xs border-collapse">
-              <thead class="bg-slate-50 sticky top-0 text-[11px] uppercase tracking-wider text-slate-600 border-b border-slate-200">
+          <div id="view-souscrite-courtier-table" class="h-80 w-full overflow-y-auto custom-scrollbar hidden">
+            <table class="w-full text-xs text-left border-collapse">
+              <thead class="sticky top-0 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200 text-slate-600 font-bold z-10">
                 <tr>
-                  <th class="py-2.5 px-3 font-bold w-12 text-center">Rang</th>
-                  <th class="py-2.5 px-3 font-bold">Courtier / Apporteur</th>
-                  <th class="py-2.5 px-3 font-bold text-right">Prime SCG-Ré</th>
-                  <th class="py-2.5 px-3 font-bold text-center w-24">Affaires</th>
-                  <th class="py-2.5 px-3 font-bold text-right w-28">Part %</th>
+                  <th class="py-2 px-3 text-center w-12">Rang</th>
+                  <th class="py-2 px-3">Courtier / Apporteur</th>
+                  <th class="py-2 px-3 text-right">Prime SCG-Ré</th>
+                  <th class="py-2 px-3 text-center">Affaires</th>
+                  <th class="py-2 px-3 text-right">Part (%)</th>
                 </tr>
               </thead>
-              <tbody id="table-souscrite-courtier-body" class="divide-y divide-slate-100">
-                <!-- Rendu Dynamique -->
-              </tbody>
+              <tbody id="table-souscrite-courtier-body" class="divide-y divide-slate-100 font-medium"></tbody>
             </table>
           </div>
         </div>
@@ -531,23 +558,39 @@ html_template = """<!DOCTYPE html>
     <!-- ========================================== -->
     <div id="tab-signee" class="tab-content hidden space-y-6">
       
-      <!-- Section Banner -->
+      <!-- Section Banner & Comparatif Selector -->
       <div class="bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 text-white rounded-xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 class="text-base font-bold flex items-center gap-2">
             <span>✅</span> Vue Prime signée — Affaires avec Bordereaux Reçus
           </h2>
           <p class="text-xs text-emerald-200 mt-0.5">
-            Analyse des affaires ARO fermes dont les bordereaux ont été effectivement reçus par la SCG-Ré, ventilées par ordre strictement décroissant.
+            Analyse des affaires ARO fermes dont les bordereaux ont été effectivement reçus par la SCG-Ré.
           </p>
         </div>
-        <div class="flex items-center gap-2">
-          <span class="bg-emerald-700/80 text-emerald-100 text-xs px-3 py-1 rounded-full font-semibold border border-emerald-500/40" id="badge-signee-count">
-            0 bordereaux reçus
-          </span>
-          <span class="bg-white/20 text-white text-xs px-3 py-1 rounded-full font-bold" id="badge-signee-total">
-            Total : 0 FCFA
-          </span>
+        
+        <div class="flex items-center gap-3 flex-wrap">
+          
+          <!-- SÉLECTEUR 2026 / COMPARATIF 2025 vs 2026 -->
+          <div class="inline-flex p-1 bg-black/25 rounded-xl border border-emerald-400/30 backdrop-blur-xs">
+            <button id="btn-signee-mode-2026" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all bg-white text-emerald-950 shadow-sm">
+              2026
+            </button>
+            <button id="btn-signee-mode-comparatif" class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-emerald-100 hover:text-white transition-all flex items-center gap-1.5">
+              <span>⚖️</span>
+              <span>Comparatif (2025 vs 2026)</span>
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="bg-emerald-700/80 text-emerald-100 text-xs px-3 py-1 rounded-full font-semibold border border-emerald-500/40" id="badge-signee-count">
+              0 bordereaux reçus
+            </span>
+            <span class="bg-white/20 text-white text-xs px-3 py-1 rounded-full font-bold" id="badge-signee-total">
+              Total : 0 FCFA
+            </span>
+          </div>
+
         </div>
       </div>
 
@@ -562,7 +605,7 @@ html_template = """<!DOCTYPE html>
                 <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
                 Prime signée par Branche
               </h3>
-              <p class="text-[11px] text-slate-500">Bordereaux reçus — Tri décroissant (FCFA)</p>
+              <p class="text-[11px] text-slate-500" id="sub-signee-branche">Bordereaux reçus — Tri décroissant (FCFA)</p>
             </div>
             <div class="flex items-center gap-2">
               <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200" id="count-branches-signee">11 branches</span>
@@ -577,25 +620,22 @@ html_template = """<!DOCTYPE html>
               </div>
             </div>
           </div>
-          <!-- Vue Graphique -->
-          <div id="view-signee-branche-chart" class="h-80 relative flex-1">
+          
+          <div id="view-signee-branche-chart" class="h-80 w-full relative">
             <canvas id="chart-signee-branche"></canvas>
           </div>
-          <!-- Vue Tableau Complet -->
-          <div id="view-signee-branche-table" class="hidden flex-1 overflow-y-auto custom-scrollbar max-h-80">
-            <table class="w-full text-left text-xs border-collapse">
-              <thead class="bg-slate-50 sticky top-0 text-[11px] uppercase tracking-wider text-slate-600 border-b border-slate-200">
+          <div id="view-signee-branche-table" class="h-80 w-full overflow-y-auto custom-scrollbar hidden">
+            <table class="w-full text-xs text-left border-collapse">
+              <thead id="table-signee-branche-head" class="sticky top-0 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200 text-slate-600 font-bold z-10">
                 <tr>
-                  <th class="py-2.5 px-3 font-bold w-12 text-center">Rang</th>
-                  <th class="py-2.5 px-3 font-bold">Branche</th>
-                  <th class="py-2.5 px-3 font-bold text-right">Prime Signée</th>
-                  <th class="py-2.5 px-3 font-bold text-center w-24">Bordereaux</th>
-                  <th class="py-2.5 px-3 font-bold text-right w-28">Part %</th>
+                  <th class="py-2 px-3 text-center w-12">Rang</th>
+                  <th class="py-2 px-3">Branche</th>
+                  <th class="py-2 px-3 text-right">Prime SCG-Ré</th>
+                  <th class="py-2 px-3 text-center">Bordereaux</th>
+                  <th class="py-2 px-3 text-right">Part (%)</th>
                 </tr>
               </thead>
-              <tbody id="table-signee-branche-body" class="divide-y divide-slate-100">
-                <!-- Rendu Dynamique -->
-              </tbody>
+              <tbody id="table-signee-branche-body" class="divide-y divide-slate-100 font-medium"></tbody>
             </table>
           </div>
         </div>
@@ -608,10 +648,10 @@ html_template = """<!DOCTYPE html>
                 <span class="w-2.5 h-2.5 rounded-full bg-teal-500"></span>
                 Prime signée par Pays
               </h3>
-              <p class="text-[11px] text-slate-500">Lieu du risque — Tri décroissant (FCFA)</p>
+              <p class="text-[11px] text-slate-500" id="sub-signee-pays">Lieu du risque — Tri décroissant (FCFA)</p>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200" id="count-pays-signee">0 pays</span>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200" id="count-pays-signee">Pays</span>
               <!-- Toggle Graphique / Tableau -->
               <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
                 <button id="btn-toggle-signee-pays-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
@@ -623,172 +663,152 @@ html_template = """<!DOCTYPE html>
               </div>
             </div>
           </div>
-          <!-- Vue Graphique -->
-          <div id="view-signee-pays-chart" class="h-80 relative flex-1">
+          
+          <div id="view-signee-pays-chart" class="h-80 w-full relative">
             <canvas id="chart-signee-pays"></canvas>
           </div>
-          <!-- Vue Tableau Complet -->
-          <div id="view-signee-pays-table" class="hidden flex-1 overflow-y-auto custom-scrollbar max-h-80">
-            <table class="w-full text-left text-xs border-collapse">
-              <thead class="bg-slate-50 sticky top-0 text-[11px] uppercase tracking-wider text-slate-600 border-b border-slate-200">
+          <div id="view-signee-pays-table" class="h-80 w-full overflow-y-auto custom-scrollbar hidden">
+            <table class="w-full text-xs text-left border-collapse">
+              <thead id="table-signee-pays-head" class="sticky top-0 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200 text-slate-600 font-bold z-10">
                 <tr>
-                  <th class="py-2.5 px-3 font-bold w-12 text-center">Rang</th>
-                  <th class="py-2.5 px-3 font-bold">Pays</th>
-                  <th class="py-2.5 px-3 font-bold text-right">Prime Signée</th>
-                  <th class="py-2.5 px-3 font-bold text-center w-24">Bordereaux</th>
-                  <th class="py-2.5 px-3 font-bold text-right w-28">Part %</th>
+                  <th class="py-2 px-3 text-center w-12">Rang</th>
+                  <th class="py-2 px-3">Pays</th>
+                  <th class="py-2 px-3 text-right">Prime SCG-Ré</th>
+                  <th class="py-2 px-3 text-center">Bordereaux</th>
+                  <th class="py-2 px-3 text-right">Part (%)</th>
                 </tr>
               </thead>
-              <tbody id="table-signee-pays-body" class="divide-y divide-slate-100">
-                <!-- Rendu Dynamique -->
-              </tbody>
+              <tbody id="table-signee-pays-body" class="divide-y divide-slate-100 font-medium"></tbody>
             </table>
           </div>
         </div>
 
       </div>
 
-      <!-- 2x2 Grid : Cédante & Courtier (Signée avec Bascule Graphique / Tableau Complet) -->
+      <!-- 2x2 Grid : Cédantes & Courtiers (Signée avec Bascule Graphique / Tableau Complet) -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         <!-- Bloc 3: Prime signée par Cédante -->
         <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col">
-          <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+          <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
             <div>
               <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-cyan-600"></span>
-                Prime signée par Cédante (Groupes standardisés)
+                <span class="w-2.5 h-2.5 rounded-full bg-cyan-500"></span>
+                Prime signée par Cédante (Groupe)
               </h3>
-              <p class="text-[11px] text-slate-500">Bordereaux reçus — Tri décroissant (FCFA)</p>
+              <p class="text-[11px] text-slate-500" id="sub-signee-cedante">Groupes consolidés — Ordre décroissant</p>
             </div>
-            <!-- Toggle Graphique / Tableau -->
-            <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
-              <button id="btn-toggle-signee-cedante-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
-                Graphique Top 10
-              </button>
-              <button id="btn-toggle-signee-cedante-table" class="px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
-                Tableau Complet
-              </button>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-cyan-50 text-cyan-700 border border-cyan-200" id="count-cedantes-signee">Cédantes</span>
+              <!-- Toggle Graphique / Tableau -->
+              <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
+                <button id="btn-toggle-signee-cedante-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
+                  Graphique Top 10
+                </button>
+                <button id="btn-toggle-signee-cedante-table" class="px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
+                  Tableau Complet
+                </button>
+              </div>
             </div>
           </div>
-
-          <!-- Vue Graphique -->
-          <div id="view-signee-cedante-chart" class="h-80 relative flex-1">
+          
+          <div id="view-signee-cedante-chart" class="h-80 w-full relative">
             <canvas id="chart-signee-cedante"></canvas>
           </div>
-
-          <!-- Vue Tableau Complet -->
-          <div id="view-signee-cedante-table" class="hidden flex-1 overflow-y-auto custom-scrollbar max-h-80">
-            <table class="w-full text-left text-xs border-collapse">
-              <thead class="bg-slate-50 sticky top-0 text-[11px] uppercase tracking-wider text-slate-600 border-b border-slate-200">
+          <div id="view-signee-cedante-table" class="h-80 w-full overflow-y-auto custom-scrollbar hidden">
+            <table class="w-full text-xs text-left border-collapse">
+              <thead id="table-signee-cedante-head" class="sticky top-0 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200 text-slate-600 font-bold z-10">
                 <tr>
-                  <th class="py-2.5 px-3 font-bold w-12 text-center">Rang</th>
-                  <th class="py-2.5 px-3 font-bold">Cédante (Groupe)</th>
-                  <th class="py-2.5 px-3 font-bold text-right">Prime Signée</th>
-                  <th class="py-2.5 px-3 font-bold text-center w-24">Bordereaux</th>
-                  <th class="py-2.5 px-3 font-bold text-right w-28">Part %</th>
+                  <th class="py-2 px-3 text-center w-12">Rang</th>
+                  <th class="py-2 px-3">Cédante (Groupe)</th>
+                  <th class="py-2 px-3 text-right">Prime SCG-Ré</th>
+                  <th class="py-2 px-3 text-center">Bordereaux</th>
+                  <th class="py-2 px-3 text-right">Part (%)</th>
                 </tr>
               </thead>
-              <tbody id="table-signee-cedante-body" class="divide-y divide-slate-100">
-                <!-- Rendu Dynamique -->
-              </tbody>
+              <tbody id="table-signee-cedante-body" class="divide-y divide-slate-100 font-medium"></tbody>
             </table>
           </div>
         </div>
 
         <!-- Bloc 4: Prime signée par Courtier -->
         <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col">
-          <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+          <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
             <div>
               <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
                 <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
                 Prime signée par Courtier / Apporteur
               </h3>
-              <p class="text-[11px] text-slate-500">Apporteurs standardisés — Tri décroissant (FCFA)</p>
+              <p class="text-[11px] text-slate-500" id="sub-signee-courtier">Apporteurs standardisés — Ordre décroissant</p>
             </div>
-            <!-- Toggle Graphique / Tableau -->
-            <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
-              <button id="btn-toggle-signee-courtier-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
-                Graphique Top 10
-              </button>
-              <button id="btn-toggle-signee-courtier-table" class="px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
-                Tableau Complet
-              </button>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200" id="count-courtiers-signee">Courtiers</span>
+              <!-- Toggle Graphique / Tableau -->
+              <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
+                <button id="btn-toggle-signee-courtier-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
+                  Graphique Top 10
+                </button>
+                <button id="btn-toggle-signee-courtier-table" class="px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
+                  Tableau Complet
+                </button>
+              </div>
             </div>
           </div>
-
-          <!-- Vue Graphique -->
-          <div id="view-signee-courtier-chart" class="h-80 relative flex-1">
+          
+          <div id="view-signee-courtier-chart" class="h-80 w-full relative">
             <canvas id="chart-signee-courtier"></canvas>
           </div>
-
-          <!-- Vue Tableau Complet -->
-          <div id="view-signee-courtier-table" class="hidden flex-1 overflow-y-auto custom-scrollbar max-h-80">
-            <table class="w-full text-left text-xs border-collapse">
-              <thead class="bg-slate-50 sticky top-0 text-[11px] uppercase tracking-wider text-slate-600 border-b border-slate-200">
+          <div id="view-signee-courtier-table" class="h-80 w-full overflow-y-auto custom-scrollbar hidden">
+            <table class="w-full text-xs text-left border-collapse">
+              <thead id="table-signee-courtier-head" class="sticky top-0 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200 text-slate-600 font-bold z-10">
                 <tr>
-                  <th class="py-2.5 px-3 font-bold w-12 text-center">Rang</th>
-                  <th class="py-2.5 px-3 font-bold">Courtier / Apporteur</th>
-                  <th class="py-2.5 px-3 font-bold text-right">Prime Signée</th>
-                  <th class="py-2.5 px-3 font-bold text-center w-24">Bordereaux</th>
-                  <th class="py-2.5 px-3 font-bold text-right w-28">Part %</th>
+                  <th class="py-2 px-3 text-center w-12">Rang</th>
+                  <th class="py-2 px-3">Courtier / Apporteur</th>
+                  <th class="py-2 px-3 text-right">Prime SCG-Ré</th>
+                  <th class="py-2 px-3 text-center">Bordereaux</th>
+                  <th class="py-2 px-3 text-right">Part (%)</th>
                 </tr>
               </thead>
-              <tbody id="table-signee-courtier-body" class="divide-y divide-slate-100">
-                <!-- Rendu Dynamique -->
-              </tbody>
+              <tbody id="table-signee-courtier-body" class="divide-y divide-slate-100 font-medium"></tbody>
             </table>
           </div>
         </div>
 
       </div>
 
-      <!-- ========================================== -->
-      <!-- BLOC 5: TOP 10 DES AFFAIRES SIGNÉES (PLEINE LARGEUR) -->
-      <!-- ========================================== -->
-      <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden mt-2">
-        <div class="bg-gradient-to-r from-emerald-950 via-emerald-900 to-teal-950 text-white p-4 flex flex-wrap items-center justify-between gap-3 border-b border-emerald-800/60">
-          <div class="flex items-center gap-3">
-            <span class="w-8 h-8 rounded-lg bg-emerald-800/80 border border-emerald-600/40 flex items-center justify-center text-emerald-300 font-extrabold text-sm shadow-xs">
-              🏆
-            </span>
-            <div>
-              <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                Top 10 des Affaires Signées (Bordereaux Reçus)
-                <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  Majeures SCG-Ré
-                </span>
-              </h3>
-              <p class="text-xs text-emerald-200/80 mt-0.5">
-                Affaires fermes avec bordereaux reçus classées par Prime SCG-Ré strictement décroissante
-              </p>
-            </div>
+      <!-- TABLEAU DÉDIÉ : TOP 10 DES AFFAIRES SIGNÉES -->
+      <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
+        <div class="flex flex-wrap items-center justify-between mb-4 pb-3 border-b border-slate-100 gap-2">
+          <div>
+            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+              Top 10 des Plus Importantes Affaires Signées (Bordereaux Reçus)
+            </h3>
+            <p class="text-[11px] text-slate-500">
+              Affaires fermes avec bordereaux reçus classées par Prime SCG-Ré strictement décroissante
+            </p>
           </div>
-          <div class="flex items-center gap-2">
-            <span id="badge-top10-signee-total" class="bg-white/10 text-emerald-100 text-xs px-3.5 py-1.5 rounded-full font-bold border border-white/20">
-              Cumul Top 10 : 0 FCFA
-            </span>
-          </div>
+          <span class="text-xs font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200" id="badge-top10-signee-total">
+            Cumul Top 10 : 0 FCFA
+          </span>
         </div>
 
         <div class="overflow-x-auto custom-scrollbar">
-          <table class="w-full text-left text-xs border-collapse">
-            <thead class="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-700 border-b border-slate-200 select-none">
+          <table class="w-full text-xs text-left border-collapse">
+            <thead class="bg-slate-50 border-y border-slate-200 text-slate-600 font-bold">
               <tr>
-                <th class="py-3 px-3 font-bold w-12 text-center">Rang</th>
-                <th class="py-3 px-3 font-bold">Affaire</th>
-                <th class="py-3 px-3 font-bold">Cédante</th>
-                <th class="py-3 px-3 font-bold">Courtier / Apporteur</th>
-                <th class="py-3 px-3 font-bold text-right">Capitaux 100 %</th>
-                <th class="py-3 px-3 font-bold text-right">Prime 100 %</th>
-                <th class="py-3 px-3 font-bold text-right">Taux Cession</th>
-                <th class="py-3 px-3 font-bold text-right">Engagement SCG-Ré</th>
-                <th class="py-3 px-3 font-bold text-right text-emerald-700">Prime SCG-Ré</th>
+                <th class="py-2.5 px-3 text-center w-12">Rang</th>
+                <th class="py-2.5 px-3">Affaire</th>
+                <th class="py-2.5 px-3">Cédante (Groupe)</th>
+                <th class="py-2.5 px-3">Courtier</th>
+                <th class="py-2.5 px-3">Branche</th>
+                <th class="py-2.5 px-3 text-right">Capitaux 100%</th>
+                <th class="py-2.5 px-3 text-right">Prime 100%</th>
+                <th class="py-2.5 px-3 text-center">Part Cession</th>
+                <th class="py-2.5 px-3 text-right font-extrabold text-emerald-700">Prime SCG-Ré</th>
               </tr>
             </thead>
-            <tbody id="table-signee-top10-body" class="divide-y divide-slate-100">
-              <!-- Rendu Dynamique JavaScript -->
-            </tbody>
+            <tbody id="table-signee-top10-body" class="divide-y divide-slate-100 font-medium"></tbody>
           </table>
         </div>
       </div>
@@ -796,68 +816,399 @@ html_template = """<!DOCTYPE html>
     </div>
 
     <!-- ========================================== -->
-    <!-- TAB 3: EXPLORATEUR DE DONNÉES & EXPORT -->
+    <!-- TAB 3: VUE AFFAIRES SANS SUITE (EXERCICE 2026) -->
+    <!-- ========================================== -->
+    <div id="tab-sans-suite" class="tab-content hidden space-y-6">
+      
+      <!-- 4 KPI Cards spécifiques Sans Suite (En-tête au même niveau que les onglets 1 & 2) -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Card 1: Nombre d'affaires sans suite -->
+        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-xs relative overflow-hidden group hover:border-rose-300 transition-all">
+          <div class="flex items-center justify-between text-slate-500 mb-1">
+            <span class="text-xs font-semibold text-slate-600">Affaires Sans Suite</span>
+            <span class="p-1 rounded bg-rose-50 text-rose-600 font-bold text-xs"># DOSSIERS</span>
+          </div>
+          <div class="text-2xl font-extrabold text-rose-900 tracking-tight" id="kpi-ss-count">0</div>
+          <div class="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
+            <span>Déperdition (nombre) :</span>
+            <span class="font-bold text-rose-600" id="kpi-ss-taux-deperdition">0%</span>
+          </div>
+          <div class="absolute bottom-0 left-0 right-0 h-1 bg-rose-500"></div>
+        </div>
+
+        <!-- Card 2: Primes 100% Manquées -->
+        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-xs relative overflow-hidden group hover:border-amber-300 transition-all">
+          <div class="flex items-center justify-between text-slate-500 mb-1">
+            <span class="text-xs font-semibold text-slate-600">Primes 100% Manquées</span>
+            <span class="p-1 rounded bg-amber-50 text-amber-600 font-bold text-xs">FCFA</span>
+          </div>
+          <div class="text-xl font-extrabold text-amber-900 tracking-tight" id="kpi-ss-primes-100">0 FCFA</div>
+          <div class="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
+            <span>Déperdition (prime 100%) :</span>
+            <span class="font-bold text-amber-700" id="kpi-ss-taux-prime">0%</span>
+          </div>
+          <div class="absolute bottom-0 left-0 right-0 h-1 bg-amber-500"></div>
+        </div>
+
+        <!-- Card 3: Capitaux 100% Sans Suite -->
+        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-xs relative overflow-hidden group hover:border-indigo-300 transition-all">
+          <div class="flex items-center justify-between text-slate-500 mb-1">
+            <span class="text-xs font-semibold text-slate-600">Capitaux 100% Sans Suite</span>
+            <span class="p-1 rounded bg-indigo-50 text-indigo-600 font-bold text-xs">CAPITAUX</span>
+          </div>
+          <div class="text-xl font-extrabold text-indigo-950 tracking-tight" id="kpi-ss-capitaux-100">0 FCFA</div>
+          <div class="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
+            <span>Valeurs assurées non concrétisées</span>
+          </div>
+          <div class="absolute bottom-0 left-0 right-0 h-1 bg-indigo-500"></div>
+        </div>
+
+        <!-- Card 4: Moyenne Primes 100% par Affaire -->
+        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-xs relative overflow-hidden group hover:border-purple-300 transition-all">
+          <div class="flex items-center justify-between text-slate-500 mb-1">
+            <span class="text-xs font-semibold text-slate-600">Prime 100% Moyenne</span>
+            <span class="p-1 rounded bg-purple-50 text-purple-600 font-bold text-xs">MOYENNE</span>
+          </div>
+          <div class="text-xl font-extrabold text-purple-900 tracking-tight" id="kpi-ss-moyenne-prime">0 FCFA</div>
+          <div class="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
+            <span>Par dossier sans suite</span>
+          </div>
+          <div class="absolute bottom-0 left-0 right-0 h-1 bg-purple-500"></div>
+        </div>
+
+      </div>
+
+      <!-- Section Banner -->
+      <div class="bg-gradient-to-r from-rose-950 via-rose-900 to-amber-950 text-white rounded-xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold flex items-center gap-2">
+            <span>🚫</span> Vue Affaires Classées Sans Suite — Production Non Concrétisée (2026)
+          </h2>
+          <p class="text-xs text-rose-200 mt-0.5">
+            Suivi des dossiers classés sans suite pour identifier le manque à gagner, les motifs de renonciation et les opportunités perdues.
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="bg-rose-800/80 text-rose-100 text-xs px-3 py-1 rounded-full font-semibold border border-rose-500/40" id="badge-sans-suite-count">
+            0 affaires sans suite
+          </span>
+          <span class="bg-white/20 text-white text-xs px-3 py-1 rounded-full font-bold" id="badge-sans-suite-total">
+            Primes 100% : 0 FCFA
+          </span>
+        </div>
+      </div>
+
+      <!-- 2x2 Grid : 4 Blocs de Ventilation Sans Suite (Branche, Pays, Cédante, Courtier) -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Bloc 1: Branche Sans Suite -->
+        <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col">
+          <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+            <div>
+              <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                Primes 100% Perdues par Branche
+              </h3>
+              <p class="text-[11px] text-slate-500">Classée par Primes 100% décroissantes</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200" id="count-branches-ss">Branches</span>
+              <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
+                <button id="btn-toggle-ss-branche-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
+                  Graphique Top
+                </button>
+                <button id="btn-toggle-ss-branche-table" class="px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
+                  Tableau Complet
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div id="view-ss-branche-chart" class="h-80 w-full relative">
+            <canvas id="chart-ss-branche"></canvas>
+          </div>
+          <div id="view-ss-branche-table" class="h-80 w-full overflow-y-auto custom-scrollbar hidden">
+            <table class="w-full text-xs text-left border-collapse">
+              <thead class="sticky top-0 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200 text-slate-600 font-bold z-10">
+                <tr>
+                  <th class="py-2 px-3 text-center w-12">Rang</th>
+                  <th class="py-2 px-3">Branche</th>
+                  <th class="py-2 px-3 text-right">Primes 100%</th>
+                  <th class="py-2 px-3 text-center">Affaires</th>
+                  <th class="py-2 px-3 text-right">Part (%)</th>
+                </tr>
+              </thead>
+              <tbody id="table-ss-branche-body" class="divide-y divide-slate-100 font-medium"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Bloc 2: Pays Sans Suite -->
+        <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col">
+          <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+            <div>
+              <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-rose-600"></span>
+                Primes 100% Perdues par Pays
+              </h3>
+              <p class="text-[11px] text-slate-500">Lieu du risque — Classé par Primes 100% décroissantes</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200" id="count-pays-ss">Pays</span>
+              <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
+                <button id="btn-toggle-ss-pays-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
+                  Graphique Top
+                </button>
+                <button id="btn-toggle-ss-pays-table" class="px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
+                  Tableau Complet
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div id="view-ss-pays-chart" class="h-80 w-full relative">
+            <canvas id="chart-ss-pays"></canvas>
+          </div>
+          <div id="view-ss-pays-table" class="h-80 w-full overflow-y-auto custom-scrollbar hidden">
+            <table class="w-full text-xs text-left border-collapse">
+              <thead class="sticky top-0 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200 text-slate-600 font-bold z-10">
+                <tr>
+                  <th class="py-2 px-3 text-center w-12">Rang</th>
+                  <th class="py-2 px-3">Pays</th>
+                  <th class="py-2 px-3 text-right">Primes 100%</th>
+                  <th class="py-2 px-3 text-center">Affaires</th>
+                  <th class="py-2 px-3 text-right">Part (%)</th>
+                </tr>
+              </thead>
+              <tbody id="table-ss-pays-body" class="divide-y divide-slate-100 font-medium"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 2x2 Grid : Cédantes & Courtiers Sans Suite -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Bloc 3: Cédante Sans Suite -->
+        <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col">
+          <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+            <div>
+              <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                Primes 100% Perdues par Cédante (Groupe)
+              </h3>
+              <p class="text-[11px] text-slate-500">Groupes d'assurances consolidés — Ordre décroissant</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200" id="count-cedantes-ss">Cédantes</span>
+              <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
+                <button id="btn-toggle-ss-cedante-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
+                  Graphique Top 10
+                </button>
+                <button id="btn-toggle-ss-cedante-table" class="px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
+                  Tableau Complet
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div id="view-ss-cedante-chart" class="h-80 w-full relative">
+            <canvas id="chart-ss-cedante"></canvas>
+          </div>
+          <div id="view-ss-cedante-table" class="h-80 w-full overflow-y-auto custom-scrollbar hidden">
+            <table class="w-full text-xs text-left border-collapse">
+              <thead class="sticky top-0 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200 text-slate-600 font-bold z-10">
+                <tr>
+                  <th class="py-2 px-3 text-center w-12">Rang</th>
+                  <th class="py-2 px-3">Cédante (Groupe)</th>
+                  <th class="py-2 px-3 text-right">Primes 100%</th>
+                  <th class="py-2 px-3 text-center">Affaires</th>
+                  <th class="py-2 px-3 text-right">Part (%)</th>
+                </tr>
+              </thead>
+              <tbody id="table-ss-cedante-body" class="divide-y divide-slate-100 font-medium"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Bloc 4: Courtier Sans Suite -->
+        <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col">
+          <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+            <div>
+              <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+                Primes 100% Perdues par Courtier / Apporteur
+              </h3>
+              <p class="text-[11px] text-slate-500">Apporteurs standardisés — Ordre décroissant</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-orange-50 text-orange-700 border border-orange-200" id="count-courtiers-ss">Courtiers</span>
+              <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
+                <button id="btn-toggle-ss-courtier-chart" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
+                  Graphique Top 10
+                </button>
+                <button id="btn-toggle-ss-courtier-table" class="px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
+                  Tableau Complet
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div id="view-ss-courtier-chart" class="h-80 w-full relative">
+            <canvas id="chart-ss-courtier"></canvas>
+          </div>
+          <div id="view-ss-courtier-table" class="h-80 w-full overflow-y-auto custom-scrollbar hidden">
+            <table class="w-full text-xs text-left border-collapse">
+              <thead class="sticky top-0 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200 text-slate-600 font-bold z-10">
+                <tr>
+                  <th class="py-2 px-3 text-center w-12">Rang</th>
+                  <th class="py-2 px-3">Courtier / Apporteur</th>
+                  <th class="py-2 px-3 text-right">Primes 100%</th>
+                  <th class="py-2 px-3 text-center">Affaires</th>
+                  <th class="py-2 px-3 text-right">Part (%)</th>
+                </tr>
+              </thead>
+              <tbody id="table-ss-courtier-body" class="divide-y divide-slate-100 font-medium"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- TABLEAU DÉTAILLÉ DES AFFAIRES SANS SUITE -->
+      <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
+        <div class="flex flex-wrap items-center justify-between mb-4 pb-3 border-b border-slate-100 gap-3">
+          <div>
+            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-rose-600"></span>
+              Liste Complète des Affaires Classées Sans Suite (2026)
+            </h3>
+            <p class="text-[11px] text-slate-500">
+              Détail des affaires abandonnées ou retirées avec montants 100% et commentaires d'origine
+            </p>
+          </div>
+          
+          <div class="flex items-center gap-3">
+            <div class="relative">
+              <input type="text" id="input-search-ss" placeholder="Rechercher affaire, cédante..." class="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-rose-500 focus:bg-white w-56">
+              <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </div>
+            <button id="btn-export-ss" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 border border-rose-300 hover:bg-rose-100 transition-all">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              <span>Export Excel</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar">
+          <table class="w-full text-xs text-left border-collapse">
+            <thead class="bg-slate-50 border-y border-slate-200 text-slate-600 font-bold">
+              <tr>
+                <th class="py-2.5 px-3 text-center w-12">N° id</th>
+                <th class="py-2.5 px-3">Date Souscr.</th>
+                <th class="py-2.5 px-3">Affaire</th>
+                <th class="py-2.5 px-3">Cédante (Groupe)</th>
+                <th class="py-2.5 px-3">Courtier</th>
+                <th class="py-2.5 px-3">Branche</th>
+                <th class="py-2.5 px-3">Pays</th>
+                <th class="py-2.5 px-3 text-right">Capitaux 100%</th>
+                <th class="py-2.5 px-3 text-right font-bold text-amber-700">Primes 100%</th>
+                <th class="py-2.5 px-3">Commentaire / Motif</th>
+              </tr>
+            </thead>
+            <tbody id="table-sans-suite-detailed-body" class="divide-y divide-slate-100 font-medium"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TAB 4: DATA EXPLORER & EXPORT (ONGLET 4)   -->
     <!-- ========================================== -->
     <div id="tab-data" class="tab-content hidden space-y-4">
       
       <!-- Toolbar -->
       <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div class="flex items-center gap-3 flex-1 min-w-[280px]">
-          <div class="relative w-full max-w-md">
-            <input type="text" id="table-search" placeholder="Rechercher une affaire, cédante, pays, courtier..." class="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
-            <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        
+        <div class="flex items-center gap-3 flex-wrap">
+          
+          <!-- SÉLECTEUR EXERCICE 2026 / 2025 (SANS TOUS) -->
+          <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-100 text-xs">
+            <button id="btn-explorer-2026" class="px-3 py-1.5 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all">
+              Exercice 2026
+            </button>
+            <button id="btn-explorer-2025" class="px-3 py-1.5 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all">
+              Exercice 2025
+            </button>
           </div>
-          <span class="text-xs text-slate-500 whitespace-nowrap" id="table-records-found">0 polices</span>
+
+          <!-- Search Input -->
+          <div class="relative min-w-[260px]">
+            <input type="text" id="table-search" placeholder="Recherche rapide (affaire, cédante, pays...)" class="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all">
+            <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </div>
+
+          <!-- Lignes par page -->
+          <div class="flex items-center gap-2 text-xs text-slate-600">
+            <span class="font-medium">Afficher :</span>
+            <select id="table-page-size" class="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold focus:ring-2 focus:ring-brand-500">
+              <option value="25">25</option>
+              <option value="50" selected>50</option>
+              <option value="100">100</option>
+              <option value="500">500</option>
+              <option value="10000">Tout</option>
+            </select>
+          </div>
+
         </div>
 
-        <div class="flex items-center gap-2">
-          <label class="text-xs text-slate-500">Lignes :</label>
-          <select id="table-page-size" class="bg-slate-50 border border-slate-300 text-xs rounded-lg px-2 py-1">
-            <option value="25">25</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-            <option value="ALL">Tout</option>
-          </select>
-          <button id="btn-export-table" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold shadow-xs transition-all">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-            Exporter ce tableau (.xlsx)
+        <div class="flex items-center gap-3">
+          <span class="text-xs font-semibold text-slate-500" id="table-records-found">0 polices</span>
+          <button id="btn-export-excel" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-all shadow-xs">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <span>Exporter en Excel (.xlsx)</span>
           </button>
         </div>
+
       </div>
 
-      <!-- Data Table Card -->
+      <!-- Main Table -->
       <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-        <div class="overflow-x-auto custom-scrollbar">
-          <table class="w-full text-left text-xs border-collapse">
-            <thead class="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-600 border-b border-slate-200 select-none">
+        <div class="overflow-x-auto custom-scrollbar max-h-[640px]">
+          <table class="w-full text-xs text-left border-collapse" id="main-data-table">
+            <thead class="sticky top-0 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200 text-slate-600 font-bold z-10 select-none">
               <tr>
-                <th class="py-3 px-3 font-bold cursor-pointer hover:bg-slate-100" data-col="id">N° ↕</th>
-                <th class="py-3 px-3 font-bold cursor-pointer hover:bg-slate-100" data-col="dateSouscription">Date Souscr. ↕</th>
-                <th class="py-3 px-3 font-bold cursor-pointer hover:bg-slate-100" data-col="affaire">Affaire / Police ↕</th>
-                <th class="py-3 px-3 font-bold cursor-pointer hover:bg-slate-100" data-col="cedante">Cédante (Groupe) ↕</th>
-                <th class="py-3 px-3 font-bold cursor-pointer hover:bg-slate-100" data-col="apporteur">Courtier ↕</th>
-                <th class="py-3 px-3 font-bold cursor-pointer hover:bg-slate-100" data-col="pays">Pays ↕</th>
-                <th class="py-3 px-3 font-bold cursor-pointer hover:bg-slate-100" data-col="branche">Branche ↕</th>
-                <th class="py-3 px-3 font-bold text-right cursor-pointer hover:bg-slate-100" data-col="capitauxSCG">Capitaux SCG ↕</th>
-                <th class="py-3 px-3 font-bold text-right cursor-pointer hover:bg-slate-100" data-col="primesSCG">Prime SCG ↕</th>
-                <th class="py-3 px-3 font-bold text-right cursor-pointer hover:bg-slate-100" data-col="commission">Commission ↕</th>
-                <th class="py-3 px-3 font-bold text-right cursor-pointer hover:bg-slate-100" data-col="primesNettes">Prime Nette ↕</th>
-                <th class="py-3 px-3 font-bold text-center cursor-pointer hover:bg-slate-100" data-col="etatBordereau">Bordereau ↕</th>
+                <th class="py-2.5 px-3 cursor-pointer hover:bg-slate-200/70" data-sort="id">ID ↕</th>
+                <th class="py-2.5 px-3 cursor-pointer hover:bg-slate-200/70" data-sort="dateSouscription">Date Souscr. ↕</th>
+                <th class="py-2.5 px-3 cursor-pointer hover:bg-slate-200/70" data-sort="affaire">Affaire ↕</th>
+                <th class="py-2.5 px-3 cursor-pointer hover:bg-slate-200/70" data-sort="cedante">Cédante (Groupe) ↕</th>
+                <th class="py-2.5 px-3 cursor-pointer hover:bg-slate-200/70" data-sort="apporteur">Courtier ↕</th>
+                <th class="py-2.5 px-3 cursor-pointer hover:bg-slate-200/70" data-sort="pays">Pays ↕</th>
+                <th class="py-2.5 px-3 cursor-pointer hover:bg-slate-200/70" data-sort="branche">Branche ↕</th>
+                <th class="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200/70" data-sort="capitauxSCG">Capitaux SCG ↕</th>
+                <th class="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200/70" data-sort="primesSCG">Prime SCG ↕</th>
+                <th class="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200/70" data-sort="commission">Commission ↕</th>
+                <th class="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200/70" data-sort="primesNettes">Prime Nette ↕</th>
+                <th class="py-2.5 px-3 text-center cursor-pointer hover:bg-slate-200/70" data-sort="etatBordereau">Statut ↕</th>
               </tr>
             </thead>
-            <tbody id="data-table-body" class="divide-y divide-slate-100 text-slate-700 font-normal">
-              <!-- Dynamically populated -->
-            </tbody>
+            <tbody id="data-table-body" class="divide-y divide-slate-100 font-medium"></tbody>
           </table>
         </div>
 
-        <!-- Pagination -->
-        <div class="px-4 py-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between text-xs text-slate-600 gap-2">
-          <div id="table-pagination-info">Page 1 sur 1</div>
-          <div class="flex items-center gap-1.5" id="table-pagination-buttons">
-            <!-- Buttons injected -->
+        <!-- Pagination Controls -->
+        <div class="p-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between text-xs text-slate-600 gap-3">
+          <div id="table-pagination-info" class="font-medium">Affichage de 1 à 50 sur 518 affaires</div>
+          <div class="flex items-center gap-1" id="table-pagination-buttons">
+            <button id="btn-page-prev" class="px-2.5 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 font-bold disabled:opacity-40">Précédent</button>
+            <span id="table-current-page" class="px-2 font-bold text-slate-800">Page 1</span>
+            <button id="btn-page-next" class="px-2.5 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 font-bold disabled:opacity-40">Suivant</button>
           </div>
         </div>
+
       </div>
 
     </div>
@@ -865,181 +1216,136 @@ html_template = """<!DOCTYPE html>
   </main>
 
   <!-- FOOTER (PLEINE LARGEUR) -->
-  <footer class="bg-white border-t border-slate-200 py-3.5 no-print mt-auto">
-    <div class="w-full px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-      <div class="flex items-center gap-2">
-        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-        <span class="font-bold text-slate-700">SCG-Ré</span> — Société Commerciale Gabonaise de Réassurance
-      </div>
-      <div>
-        <span>Tableau de Bord ARO — Cessions FAC — Pleine Largeur</span>
-      </div>
+  <footer class="bg-white border-t border-slate-200 py-4 px-4 sm:px-6 lg:px-8 text-xs text-slate-500 flex flex-wrap items-center justify-between gap-3 no-print mt-auto">
+    <div class="flex items-center gap-2">
+      <span class="font-bold text-slate-700">Société Commerciale Gabonaise de Réassurance (SCG-Ré)</span>
+      <span>•</span>
+      <span>Souscription FAC ARO (2025 - 2026)</span>
+    </div>
+    <div class="flex items-center gap-4 text-slate-400">
+      <span>Actualisation dynamique & persistance locale autonome</span>
     </div>
   </footer>
 
-  <!-- MODAL: UPLOAD EXCEL FILE -->
-  <div id="upload-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-slate-200">
-      
-      <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-        <div class="flex items-center gap-2">
-          <div class="p-2 rounded-lg bg-brand-50 text-brand-600">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-          </div>
-          <div>
-            <h3 class="text-sm font-bold text-slate-900">Charger la production ARO actualisée</h3>
-            <p class="text-[11px] text-slate-500">Classeur Excel brut (.xlsx, .xls) — Traitement 100% automatique</p>
-          </div>
-        </div>
-        <button id="btn-close-upload" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+  <!-- MODAL IMPORT EXCEL -->
+  <div id="upload-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+          <span>📁</span> Importer un nouveau fichier Excel
+        </h3>
+        <button id="btn-close-upload" class="text-slate-400 hover:text-slate-700 p-1 rounded-lg">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
       </div>
 
-      <!-- Drag & Drop Zone -->
-      <div id="drop-zone" class="border-2 border-dashed border-slate-300 hover:border-brand-500 hover:bg-brand-50/30 rounded-xl p-8 text-center transition-all cursor-pointer">
-        <input type="file" id="file-input" accept=".xlsx, .xls, .xlsm" class="hidden">
-        <svg class="w-10 h-10 text-slate-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-        <p class="text-xs font-semibold text-slate-700">Cliquez pour parcourir ou glissez votre classeur ARO ici</p>
-        <p class="text-[11px] text-slate-400 mt-1">Formats acceptés : Classeur Excel (.xlsx, .xls, .xlsm)</p>
+      <p class="text-xs text-slate-600 leading-relaxed">
+        Glissez-déposez votre nouveau classeur Excel de production (<code class="bg-slate-100 px-1 py-0.5 rounded text-brand-700 font-semibold">.xlsx</code> ou <code class="bg-slate-100 px-1 py-0.5 rounded text-brand-700 font-semibold">.xlsm</code>).<br>
+        Le fichier sera immédiatement analysé, standardisé et sauvegardé par défaut dans votre navigateur.
+      </p>
+
+      <div id="drop-zone" class="border-2 border-dashed border-brand-300 hover:border-brand-500 rounded-xl p-8 text-center bg-brand-50/40 hover:bg-brand-50/70 transition-all cursor-pointer">
+        <svg class="w-10 h-10 text-brand-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+        <span class="text-xs font-bold text-brand-900 block">Cliquez ou déposez votre fichier Excel ici</span>
+        <span class="text-[11px] text-slate-500 mt-1 block">Compatible avec les fichiers ARO 2026 et 2025</span>
+        <input type="file" id="file-input" accept=".xlsx, .xlsm" class="hidden">
       </div>
 
-      <div class="mt-4 p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-[11px] text-emerald-800 flex items-start gap-2">
-        <svg class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <span><strong>Traitements 100% automatiques :</strong> standardisation des 11 branches, normalisation des pays, correction des apporteurs et regroupement des cédantes par Groupe d'assurance.</span>
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button id="btn-cancel-upload" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100">Annuler</button>
       </div>
-
-      <div class="mt-2.5 p-3 bg-brand-50 rounded-xl border border-brand-200 text-[11px] text-brand-900 flex items-start gap-2">
-        <svg class="w-4 h-4 text-brand-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
-        <span><strong>Mémorisation permanente :</strong> La base importée est automatiquement enregistrée dans votre navigateur. Au redémarrage ou en rouvrant le lien, <strong>vos nouvelles données restent actives par défaut</strong>. Vous pourrez rétablir la base initiale à tout moment.</span>
-      </div>
-
     </div>
   </div>
 
   <!-- TOAST NOTIFICATION -->
-  <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
-    <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-    <span id="toast-message">Action effectuée</span>
+  <div id="toast" class="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg text-xs font-medium flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <span id="toast-icon">✅</span>
+    <span id="toast-message">Notification</span>
   </div>
 
-  <!-- EMBEDDED DATASET & CORE APPLICATION LOGIC -->
+  <!-- ======================================================== -->
+  <!-- JAVASCRIPT APPLICATION CORE                             -->
+  <!-- ======================================================== -->
   <script>
     // Register ChartDataLabels plugin globally
     Chart.register(ChartDataLabels);
 
-    // INITIAL EMBEDDED CLEANED DATA
-    /*__START_RECORDS__*/
-    const INITIAL_RECORDS = __INITIAL_RECORDS__;
-    /*__END_RECORDS__*/
-    const INITIAL_CLEANING_LOG = __INITIAL_CLEANING_LOG__;
-    const INITIAL_BUILD_TIMESTAMP = "__BUILD_TIMESTAMP__";
-
-    // PERSISTENCE STORAGE CONFIG
-    const DB_NAME = 'SCG_RE_ARO_DB';
-    const DB_VERSION = 1;
-    const STORE_NAME = 'datasets';
-    const RECORD_KEY = 'latest_imported_dataset';
-    const LOCAL_STORAGE_KEY = 'SCG_RE_ARO_LATEST_DATA_V2';
-
-    // ACTIVE STATE
-    let allRecords = [...INITIAL_RECORDS];
-    let cleaningLog = [...INITIAL_CLEANING_LOG];
-    let currentDatasetMeta = {
-      isCustom: false,
-      fileName: "Base d'origine SCG-Ré",
-      importDate: null,
-      importTimestamp: null,
-      recordCount: INITIAL_RECORDS.length
-    };
-
-    // Fast synchronous pre-load via localStorage (immediate zero-latency)
-    try {
-      const syncItem = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (syncItem) {
-        const parsed = JSON.parse(syncItem);
-        if (parsed && Array.isArray(parsed.records) && parsed.records.length > 0) {
-          allRecords = parsed.records;
-          currentDatasetMeta = {
-            isCustom: true,
-            fileName: parsed.fileName || 'Base personnalisée',
-            importDate: parsed.importDate || null,
-            importTimestamp: parsed.importTimestamp || null,
-            recordCount: parsed.records.length
-          };
-        }
-      }
-    } catch (e) {
-      console.warn('Sync cache check:', e);
-    }
-
-    let filteredRecords = [...allRecords];
-    let currentTabId = 'tab-souscrite';
-
-    // CHART INSTANCES
-    let charts = {};
-
-    // TABLE STATE (Tab Explorateur)
-    let currentPage = 1;
-    let pageSize = 25;
-    let sortColumn = 'id';
-    let sortDirection = 1; // 1 = asc, -1 = desc
-    let searchTerm = '';
-
-    // ==========================================
-    // ROBUST FORMATTERS (SÉPARATEURS D'ESPACES)
-    // ==========================================
+    // Formatter helpers
     const formatFCFA = (val) => {
       if (val === null || val === undefined || isNaN(val)) return '0 FCFA';
       const rounded = Math.round(val);
-      return rounded.toString().replace(/\\B(?=(\\d{3})+(?!\\d))/g, ' ') + ' FCFA';
-    };
-
-    const formatNum = (val) => {
-      if (val === null || val === undefined || isNaN(val)) return '0';
-      const rounded = Math.round(val);
-      return rounded.toString().replace(/\\B(?=(\\d{3})+(?!\\d))/g, ' ');
+      const str = Math.abs(rounded).toString().replace(/\\B(?=(\\d{3})+(?!\\d))/g, ' ');
+      return (rounded < 0 ? '-' : '') + str + ' FCFA';
     };
 
     const formatPercent = (val) => {
-      if (val === null || val === undefined || isNaN(val)) return '0%';
+      if (val === null || val === undefined || isNaN(val)) return '0.0%';
       return (val * 100).toFixed(1) + '%';
     };
 
-    // Compact format for bar charts datalabels (e.g. 1 853 M or 45 k)
     const formatBarValue = (val) => {
-      if (!val || isNaN(val)) return '0';
+      if (!val || val === 0) return '';
       const abs = Math.abs(val);
-      if (abs >= 1e9) {
-        return (val / 1e9).toFixed(2).replace('.', ',') + ' Mrd';
-      } else if (abs >= 1e6) {
-        return (val / 1e6).toFixed(1).replace('.', ',') + ' M';
-      } else if (abs >= 1e3) {
-        return (val / 1e3).toFixed(0).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ' ') + ' k';
-      }
-      return formatNum(val);
+      if (abs >= 1e9) return (val / 1e9).toFixed(2) + ' Md';
+      if (abs >= 1e6) return (val / 1e6).toFixed(1) + ' M';
+      if (abs >= 1e3) return (val / 1e3).toFixed(0) + ' k';
+      return Math.round(val).toString();
     };
 
-    // TOAST NOTIFIER
-    function showToast(msg) {
+    function showToast(msg, icon = '✅') {
       const toast = document.getElementById('toast');
-      const toastMsg = document.getElementById('toast-message');
-      toastMsg.textContent = msg;
+      document.getElementById('toast-message').textContent = msg;
+      document.getElementById('toast-icon').textContent = icon;
       toast.classList.remove('translate-y-20', 'opacity-0');
       setTimeout(() => {
         toast.classList.add('translate-y-20', 'opacity-0');
       }, 3500);
     }
 
-    // ==========================================
-    // PERSISTENCE STORAGE ENGINE (IndexedDB + localStorage)
-    // ==========================================
+    // EMBEDDED SOURCE DATA
+    const INITIAL_RECORDS_2026 = __INITIAL_RECORDS_2026__;
+    const INITIAL_RECORDS_2025 = __INITIAL_RECORDS_2025__;
+    const INITIAL_RECORDS = INITIAL_RECORDS_2026;
+    const INITIAL_CLEANING_LOG = __INITIAL_CLEANING_LOG__;
+    const INITIAL_BUILD_TIMESTAMP = "__BUILD_TIMESTAMP__";
+
+    // PERSISTENCE STORAGE CONFIG
+    const DB_NAME = 'SCG_RE_ARO_DB_V3';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'datasets';
+    const RECORD_KEY = 'latest_imported_dataset';
+    const LOCAL_STORAGE_KEY = 'SCG_RE_ARO_LATEST_DATA_V3';
+
+    // ACTIVE STATE
+    let allRecords = [...INITIAL_RECORDS_2026];
+    let records2025 = [...INITIAL_RECORDS_2025];
+    let filteredRecords = [...allRecords];
+    let currentTabId = 'tab-souscrite';
+    let selectedBranche = '';
+    let signeeViewMode = '2026'; // '2026' or 'comparatif'
+    let explorerExercice = '2026'; // '2026' or '2025'
+
+    // Table Explorer state
+    let searchTerm = '';
+    let sortColumn = 'id';
+    let sortDirection = 1;
+    let currentPage = 1;
+    let pageSize = 50;
+
+    // Sans Suite detailed table state
+    let searchSS = '';
+
+    // Chart instances storage
+    const charts = {};
+
+    // IndexedDB helper
     function getIDB() {
       return new Promise((resolve, reject) => {
         if (!window.indexedDB) {
-          return reject(new Error('IndexedDB non supporté'));
+          resolve(null);
+          return;
         }
-        const req = window.indexedDB.open(DB_NAME, DB_VERSION);
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
         req.onupgradeneeded = (e) => {
           const db = e.target.result;
           if (!db.objectStoreNames.contains(STORE_NAME)) {
@@ -1047,229 +1353,94 @@ html_template = """<!DOCTYPE html>
           }
         };
         req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error || new Error('Erreur ouverture IDB'));
+        req.onerror = () => resolve(null);
       });
     }
 
-    async function saveDatasetToStorage(datasetObj) {
-      // 1. Sauvegarde IndexedDB (capacité virtuellement illimitée)
+    async function saveDatasetToStorage(dataObj) {
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataObj));
+      } catch (err) {
+        console.warn('LocalStorage limit exceeded, relying on IndexedDB:', err);
+      }
       try {
         const db = await getIDB();
-        await new Promise((resolve, reject) => {
+        if (db) {
           const tx = db.transaction(STORE_NAME, 'readwrite');
-          const store = tx.objectStore(STORE_NAME);
-          const req = store.put(datasetObj, RECORD_KEY);
-          req.onsuccess = () => resolve();
-          req.onerror = () => reject(req.error);
-        });
+          tx.objectStore(STORE_NAME).put(dataObj, RECORD_KEY);
+        }
       } catch (err) {
-        console.warn('IndexedDB write warning:', err);
-      }
-
-      // 2. Sauvegarde localStorage rapide
-      try {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(datasetObj));
-      } catch (err) {
-        console.warn('localStorage write warning (limite de quota possible):', err);
+        console.error('IndexedDB save error:', err);
       }
     }
 
     async function loadDatasetFromStorage() {
-      // 1. Essai IndexedDB en priorité
       try {
         const db = await getIDB();
-        const data = await new Promise((resolve, reject) => {
-          const tx = db.transaction(STORE_NAME, 'readonly');
-          const store = tx.objectStore(STORE_NAME);
-          const req = store.get(RECORD_KEY);
-          req.onsuccess = () => resolve(req.result);
-          req.onerror = () => reject(req.error);
-        });
-        if (data && Array.isArray(data.records) && data.records.length > 0) {
-          return data;
+        if (db) {
+          return new Promise((resolve) => {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const req = tx.objectStore(STORE_NAME).get(RECORD_KEY);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => resolve(null);
+          });
         }
       } catch (err) {
-        console.warn('IndexedDB read warning:', err);
+        console.warn('IDB read failed, fallback to localStorage', err);
       }
-
-      // 2. Repli localStorage
       try {
-        const item = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (item) {
-          const parsed = JSON.parse(item);
-          if (parsed && Array.isArray(parsed.records) && parsed.records.length > 0) {
-            return parsed;
-          }
-        }
-      } catch (err) {
-        console.warn('localStorage read warning:', err);
+        const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) {
+        return null;
       }
-
-      return null;
     }
 
     async function clearDatasetFromStorage() {
       try {
-        const db = await getIDB();
-        await new Promise((resolve, reject) => {
-          const tx = db.transaction(STORE_NAME, 'readwrite');
-          const store = tx.objectStore(STORE_NAME);
-          const req = store.delete(RECORD_KEY);
-          req.onsuccess = () => resolve();
-          req.onerror = () => reject(req.error);
-        });
-      } catch (err) {
-        console.warn('IndexedDB delete warning:', err);
-      }
-
-      try {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
+        const db = await getIDB();
+        if (db) {
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          tx.objectStore(STORE_NAME).delete(RECORD_KEY);
+        }
       } catch (err) {
-        console.warn('localStorage delete warning:', err);
-      }
-    }
-
-    function updateDatasetStatusUI() {
-      const statusName = document.getElementById('dataset-status-name');
-      const statusDetail = document.getElementById('dataset-status-detail');
-      const statusDot = document.getElementById('dataset-status-dot');
-      const btnReset = document.getElementById('btn-reset-dataset');
-      const btnDownloadHtml = document.getElementById('btn-download-html');
-      const headerCount = document.getElementById('header-records-count');
-
-      if (headerCount) {
-        headerCount.textContent = `${allRecords.length} affaires chargées`;
-      }
-
-      if (currentDatasetMeta.isCustom) {
-        if (statusName) {
-          statusName.textContent = currentDatasetMeta.fileName || 'Base personnalisée';
-          statusName.title = `Fichier : ${currentDatasetMeta.fileName || 'Inconnu'}\\nDate d'enregistrement : ${currentDatasetMeta.importDate || 'Récemment'}\\nAffaires : ${currentDatasetMeta.recordCount}`;
-        }
-        if (statusDetail) {
-          statusDetail.textContent = `(Enregistrée par défaut • ${currentDatasetMeta.recordCount} aff.)`;
-        }
-        if (statusDot) {
-          statusDot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
-        }
-        if (btnReset) btnReset.classList.remove('hidden');
-        if (btnDownloadHtml) btnDownloadHtml.classList.remove('hidden');
-      } else {
-        if (statusName) {
-          statusName.textContent = "Base d'origine SCG-Ré";
-          statusName.title = "Données préchargées de base (498 affaires)";
-        }
-        if (statusDetail) {
-          statusDetail.textContent = `(${allRecords.length} affaires)`;
-        }
-        if (statusDot) {
-          statusDot.className = 'w-2 h-2 rounded-full bg-slate-400';
-        }
-        if (btnReset) btnReset.classList.add('hidden');
-        if (btnDownloadHtml) btnDownloadHtml.classList.add('hidden');
-      }
-    }
-
-    function setupStorageControls() {
-      const btnReset = document.getElementById('btn-reset-dataset');
-      if (btnReset) {
-        btnReset.addEventListener('click', async () => {
-          const confirmed = confirm("Voulez-vous rétablir la base de données d'origine de la SCG-Ré ?\\n\\nLa base importée sera supprimée de la mémoire locale et le tableau de bord utilisera à nouveau ses données d'origine.");
-          if (confirmed) {
-            await clearDatasetFromStorage();
-            allRecords = [...INITIAL_RECORDS];
-            filteredRecords = [...allRecords];
-            currentDatasetMeta = {
-              isCustom: false,
-              fileName: "Base d'origine SCG-Ré",
-              importDate: null,
-              importTimestamp: null,
-              recordCount: INITIAL_RECORDS.length
-            };
-            updateDatasetStatusUI();
-            populateFilterOptions();
-            document.getElementById('filter-branche').value = 'ALL';
-            applyFilters();
-            showToast("Base d'origine SCG-Ré rétablie avec succès !");
-          }
-        });
-      }
-
-      const btnDownload = document.getElementById('btn-download-html');
-      if (btnDownload) {
-        btnDownload.addEventListener('click', downloadStandaloneHtml);
-      }
-    }
-
-    function downloadStandaloneHtml() {
-      try {
-        let fullHtml = '<!DOCTYPE html>\\n' + document.documentElement.outerHTML;
-        const startMarker = '/*__START_RECORDS__*/';
-        const endMarker = '/*__END_RECORDS__*/';
-        const startIdx = fullHtml.indexOf(startMarker);
-        const endIdx = fullHtml.indexOf(endMarker);
-
-        if (startIdx !== -1 && endIdx !== -1) {
-          const before = fullHtml.substring(0, startIdx + startMarker.length);
-          const after = fullHtml.substring(endIdx);
-          fullHtml = before + '\\n    const INITIAL_RECORDS = ' + JSON.stringify(allRecords) + ';\\n    ' + after;
-        }
-
-        const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'index.html';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        showToast('Fichier index.html autonome téléchargé !');
-      } catch (err) {
-        console.error('Erreur export HTML:', err);
-        alert('Erreur lors du téléchargement : ' + err.message);
+        console.error('Clear error:', err);
       }
     }
 
     // ==========================================
-    // INITIALIZATION ON DOM READY
+    // INITIALIZATION & TABS SETUP
     // ==========================================
-    document.addEventListener('DOMContentLoaded', async () => {
-      // Vérification asynchrone IndexedDB (au cas où les données y sont plus récentes/complètes)
-      try {
-        const idbData = await loadDatasetFromStorage();
-        if (idbData && Array.isArray(idbData.records) && idbData.records.length > 0) {
-          allRecords = idbData.records;
-          currentDatasetMeta = {
-            isCustom: true,
-            fileName: idbData.fileName || 'Base personnalisée',
-            importDate: idbData.importDate || null,
-            importTimestamp: idbData.importTimestamp || null,
-            recordCount: idbData.records.length
-          };
-          filteredRecords = [...allRecords];
+    window.addEventListener('DOMContentLoaded', async () => {
+      const saved = await loadDatasetFromStorage();
+      if (saved && Array.isArray(saved.records2026) && saved.records2026.length > 0) {
+        allRecords = saved.records2026;
+        if (Array.isArray(saved.records2025)) {
+          records2025 = saved.records2025;
         }
-      } catch (err) {
-        console.warn('IDB load check:', err);
+        filteredRecords = [...allRecords];
+        showToast('Données sauvegardées chargées (' + allRecords.length + ' affaires 2026)');
       }
 
       setupTabs();
-      setupFilters();
-      setupUploadModal();
-      setupTableControls();
+      setupSigneeComparativeToggle();
+      setupExplorerExerciceToggle();
       setupViewToggles();
+      setupFilters();
+      setupTableControls();
+      setupSansSuiteControls();
+      setupUploadModal();
       setupStorageControls();
-      updateDatasetStatusUI();
+
       renderAll();
     });
 
-    // ==========================================
-    // TAB SWITCHING & DYNAMIC KPI CONTEXT
-    // ==========================================
     function setupTabs() {
       const tabDefs = [
         { id: 'tab-btn-souscrite', target: 'tab-souscrite' },
         { id: 'tab-btn-signee', target: 'tab-signee' },
+        { id: 'tab-btn-sans-suite', target: 'tab-sans-suite' },
         { id: 'tab-btn-data', target: 'tab-data' }
       ];
 
@@ -1284,13 +1455,23 @@ html_template = """<!DOCTYPE html>
           const activeContent = document.getElementById(target);
           if (activeContent) activeContent.classList.remove('hidden');
 
-          // Strict context isolation : re-render KPIs and filter status
-          renderKPIs();
-          if (currentTabId === 'tab-signee') {
-            renderTop10AffairesSignees();
+          // Gestion de l'affichage du bandeau permanent de KPI de souscription/signée
+          const permRibbon = document.getElementById('ribbon-permanent-kpis');
+          if (permRibbon) {
+            if (target === 'tab-sans-suite' || target === 'tab-data') {
+              permRibbon.classList.add('hidden');
+            } else {
+              permRibbon.classList.remove('hidden');
+            }
           }
 
-          // Resize active charts
+          renderKPIs();
+          if (currentTabId === 'tab-signee') {
+            renderVueSignee();
+          } else if (currentTabId === 'tab-sans-suite') {
+            renderVueSansSuite();
+          }
+
           setTimeout(() => {
             Object.values(charts).forEach(c => {
               if (c && typeof c.resize === 'function') c.resize();
@@ -1305,167 +1486,232 @@ html_template = """<!DOCTYPE html>
     function updateTabStyles() {
       const btnSouscrite = document.getElementById('tab-btn-souscrite');
       const btnSignee = document.getElementById('tab-btn-signee');
+      const btnSansSuite = document.getElementById('tab-btn-sans-suite');
       const btnData = document.getElementById('tab-btn-data');
 
       const badgeSouscrite = document.getElementById('badge-tab-souscrite');
       const badgeSignee = document.getElementById('badge-tab-signee');
+      const badgeSansSuite = document.getElementById('badge-tab-sans-suite');
       const badgeData = document.getElementById('badge-tab-data');
 
       // Styles de base au repos
-      if (btnSouscrite) {
-        btnSouscrite.className = 'tab-btn px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-150 flex items-center gap-2 whitespace-nowrap';
-      }
-      // Onglet Prime signée : Vert émeraude subtil de base au repos
-      if (btnSignee) {
-        btnSignee.className = 'tab-btn px-4 py-2 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300/80 hover:bg-emerald-100 hover:border-emerald-400 transition-all duration-150 flex items-center gap-2 whitespace-nowrap shadow-2xs';
-      }
-      if (btnData) {
-        btnData.className = 'tab-btn px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-150 flex items-center gap-2 whitespace-nowrap';
-      }
+      if (btnSouscrite) btnSouscrite.className = 'tab-btn px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-150 flex items-center gap-2 whitespace-nowrap';
+      if (btnSignee) btnSignee.className = 'tab-btn px-4 py-2 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300/80 hover:bg-emerald-100 hover:border-emerald-400 transition-all duration-150 flex items-center gap-2 whitespace-nowrap shadow-2xs';
+      if (btnSansSuite) btnSansSuite.className = 'tab-btn px-4 py-2 rounded-lg text-xs font-bold bg-rose-50 text-rose-800 border border-rose-300/80 hover:bg-rose-100 hover:border-rose-400 transition-all duration-150 flex items-center gap-2 whitespace-nowrap shadow-2xs';
+      if (btnData) btnData.className = 'tab-btn px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-150 flex items-center gap-2 whitespace-nowrap';
 
       if (badgeSouscrite) badgeSouscrite.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-200 text-slate-700 ml-1';
       if (badgeSignee) badgeSignee.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-300/70 ml-1';
+      if (badgeSansSuite) badgeSansSuite.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-rose-100 text-rose-800 border border-rose-300/70 ml-1';
       if (badgeData) badgeData.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-200 text-slate-700 ml-1';
 
       if (currentTabId === 'tab-souscrite' && btnSouscrite) {
         btnSouscrite.className = 'tab-btn active px-4 py-2 rounded-lg text-xs font-bold bg-brand-600 text-white shadow-sm shadow-brand-500/25 ring-1 ring-brand-700 transition-all duration-150 flex items-center gap-2 whitespace-nowrap';
         if (badgeSouscrite) badgeSouscrite.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-white/20 text-white ml-1';
       } else if (currentTabId === 'tab-signee' && btnSignee) {
-        // Devient Vert Intense plein avec ombre lumineuse lorsqu'il est actif
         btnSignee.className = 'tab-btn active px-4 py-2 rounded-lg text-xs font-bold bg-emerald-600 text-white shadow-sm shadow-emerald-500/30 ring-1 ring-emerald-700 transition-all duration-150 flex items-center gap-2 whitespace-nowrap';
         if (badgeSignee) badgeSignee.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-white/20 text-white ml-1';
+      } else if (currentTabId === 'tab-sans-suite' && btnSansSuite) {
+        btnSansSuite.className = 'tab-btn active px-4 py-2 rounded-lg text-xs font-bold bg-rose-600 text-white shadow-sm shadow-rose-500/30 ring-1 ring-rose-700 transition-all duration-150 flex items-center gap-2 whitespace-nowrap';
+        if (badgeSansSuite) badgeSansSuite.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-white/20 text-white ml-1';
       } else if (currentTabId === 'tab-data' && btnData) {
         btnData.className = 'tab-btn active px-4 py-2 rounded-lg text-xs font-bold bg-slate-800 text-white shadow-sm shadow-slate-700/25 ring-1 ring-slate-900 transition-all duration-150 flex items-center gap-2 whitespace-nowrap';
         if (badgeData) badgeData.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-white/20 text-white ml-1';
       }
     }
 
-    // ==========================================
-    // TOGGLES GRAPHIQUE / TABLEAU COMPLET POUR TOUS LES BLOCS
-    // ==========================================
-    function bindChartTableToggle(chartBtnId, tableBtnId, chartViewId, tableViewId, chartKey) {
-      const chartBtn = document.getElementById(chartBtnId);
-      const tableBtn = document.getElementById(tableBtnId);
-      const chartView = document.getElementById(chartViewId);
-      const tableView = document.getElementById(tableViewId);
-      if (!chartBtn || !tableBtn || !chartView || !tableView) return;
+    // Sélecteur 2026 / Comparatif dans l'onglet Prime signée
+    function setupSigneeComparativeToggle() {
+      const btn2026 = document.getElementById('btn-signee-mode-2026');
+      const btnComp = document.getElementById('btn-signee-mode-comparatif');
+      if (!btn2026 || !btnComp) return;
 
-      chartBtn.addEventListener('click', () => {
-        chartBtn.className = 'px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all';
-        tableBtn.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all';
-        chartView.classList.remove('hidden');
-        tableView.classList.add('hidden');
-        if (chartKey && charts[chartKey] && typeof charts[chartKey].resize === 'function') {
-          charts[chartKey].resize();
-        }
+      btn2026.addEventListener('click', () => {
+        signeeViewMode = '2026';
+        btn2026.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all bg-white text-emerald-950 shadow-sm';
+        btnComp.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold text-emerald-100 hover:text-white transition-all flex items-center gap-1.5';
+        renderKPIs();
+        renderVueSignee();
       });
 
-      tableBtn.addEventListener('click', () => {
-        tableBtn.className = 'px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all';
-        chartBtn.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all';
-        tableView.classList.remove('hidden');
-        chartView.classList.add('hidden');
+      btnComp.addEventListener('click', () => {
+        signeeViewMode = 'comparatif';
+        btnComp.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all bg-white text-emerald-950 shadow-sm flex items-center gap-1.5';
+        btn2026.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold text-emerald-100 hover:text-white transition-all';
+        renderKPIs();
+        renderVueSignee();
+      });
+    }
+
+    // Sélecteur d'exercice dans l'Explorateur (2026 vs 2025)
+    function setupExplorerExerciceToggle() {
+      const btn2026 = document.getElementById('btn-explorer-2026');
+      const btn2025 = document.getElementById('btn-explorer-2025');
+      if (!btn2026 || !btn2025) return;
+
+      btn2026.addEventListener('click', () => {
+        explorerExercice = '2026';
+        btn2026.className = 'px-3 py-1.5 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all';
+        btn2025.className = 'px-3 py-1.5 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all';
+        currentPage = 1;
+        renderDataTable();
+      });
+
+      btn2025.addEventListener('click', () => {
+        explorerExercice = '2025';
+        btn2025.className = 'px-3 py-1.5 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all';
+        btn2026.className = 'px-3 py-1.5 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all';
+        currentPage = 1;
+        renderDataTable();
+      });
+    }
+
+    // ==========================================
+    // TOGGLES GRAPHIQUE / TABLEAU COMPLET
+    // ==========================================
+    function bindChartTableToggle(btnChartId, btnTableId, viewChartId, viewTableId) {
+      const btnChart = document.getElementById(btnChartId);
+      const btnTable = document.getElementById(btnTableId);
+      const viewChart = document.getElementById(viewChartId);
+      const viewTable = document.getElementById(viewTableId);
+
+      if (!btnChart || !btnTable || !viewChart || !viewTable) return;
+
+      btnChart.addEventListener('click', () => {
+        viewChart.classList.remove('hidden');
+        viewTable.classList.add('hidden');
+        btnChart.className = 'px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all';
+        btnTable.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all';
+        // Resize canvas
+        const canvas = viewChart.querySelector('canvas');
+        if (canvas && charts[canvas.id]) charts[canvas.id].resize();
+      });
+
+      btnTable.addEventListener('click', () => {
+        viewTable.classList.remove('hidden');
+        viewChart.classList.add('hidden');
+        btnTable.className = 'px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-xs border border-slate-200/80 transition-all';
+        btnChart.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-500 hover:text-slate-800 transition-all';
       });
     }
 
     function setupViewToggles() {
-      // 1. Souscrite Branche
-      bindChartTableToggle('btn-toggle-souscrite-branche-chart', 'btn-toggle-souscrite-branche-table', 'view-souscrite-branche-chart', 'view-souscrite-branche-table', 'chart-souscrite-branche');
-      // 2. Souscrite Pays
-      bindChartTableToggle('btn-toggle-souscrite-pays-chart', 'btn-toggle-souscrite-pays-table', 'view-souscrite-pays-chart', 'view-souscrite-pays-table', 'chart-souscrite-pays');
-      // 3. Souscrite Cédante
-      bindChartTableToggle('btn-toggle-souscrite-cedante-chart', 'btn-toggle-souscrite-cedante-table', 'view-souscrite-cedante-chart', 'view-souscrite-cedante-table', 'chart-souscrite-cedante');
-      // 4. Souscrite Courtier
-      bindChartTableToggle('btn-toggle-souscrite-courtier-chart', 'btn-toggle-souscrite-courtier-table', 'view-souscrite-courtier-chart', 'view-souscrite-courtier-table', 'chart-souscrite-courtier');
+      // 1. Vue Souscrite
+      bindChartTableToggle('btn-toggle-souscrite-branche-chart', 'btn-toggle-souscrite-branche-table', 'view-souscrite-branche-chart', 'view-souscrite-branche-table');
+      bindChartTableToggle('btn-toggle-souscrite-pays-chart', 'btn-toggle-souscrite-pays-table', 'view-souscrite-pays-chart', 'view-souscrite-pays-table');
+      bindChartTableToggle('btn-toggle-souscrite-cedante-chart', 'btn-toggle-souscrite-cedante-table', 'view-souscrite-cedante-chart', 'view-souscrite-cedante-table');
+      bindChartTableToggle('btn-toggle-souscrite-courtier-chart', 'btn-toggle-souscrite-courtier-table', 'view-souscrite-courtier-chart', 'view-souscrite-courtier-table');
 
-      // 5. Signée Branche
-      bindChartTableToggle('btn-toggle-signee-branche-chart', 'btn-toggle-signee-branche-table', 'view-signee-branche-chart', 'view-signee-branche-table', 'chart-signee-branche');
-      // 6. Signée Pays
-      bindChartTableToggle('btn-toggle-signee-pays-chart', 'btn-toggle-signee-pays-table', 'view-signee-pays-chart', 'view-signee-pays-table', 'chart-signee-pays');
-      // 7. Signée Cédante
-      bindChartTableToggle('btn-toggle-signee-cedante-chart', 'btn-toggle-signee-cedante-table', 'view-signee-cedante-chart', 'view-signee-cedante-table', 'chart-signee-cedante');
-      // 8. Signée Courtier
-      bindChartTableToggle('btn-toggle-signee-courtier-chart', 'btn-toggle-signee-courtier-table', 'view-signee-courtier-chart', 'view-signee-courtier-table', 'chart-signee-courtier');
+      // 2. Vue Signée
+      bindChartTableToggle('btn-toggle-signee-branche-chart', 'btn-toggle-signee-branche-table', 'view-signee-branche-chart', 'view-signee-branche-table');
+      bindChartTableToggle('btn-toggle-signee-pays-chart', 'btn-toggle-signee-pays-table', 'view-signee-pays-chart', 'view-signee-pays-table');
+      bindChartTableToggle('btn-toggle-signee-cedante-chart', 'btn-toggle-signee-cedante-table', 'view-signee-cedante-chart', 'view-signee-cedante-table');
+      bindChartTableToggle('btn-toggle-signee-courtier-chart', 'btn-toggle-signee-courtier-table', 'view-signee-courtier-chart', 'view-signee-courtier-table');
+
+      // 3. Vue Sans Suite
+      bindChartTableToggle('btn-toggle-ss-branche-chart', 'btn-toggle-ss-branche-table', 'view-ss-branche-chart', 'view-ss-branche-table');
+      bindChartTableToggle('btn-toggle-ss-pays-chart', 'btn-toggle-ss-pays-table', 'view-ss-pays-chart', 'view-ss-pays-table');
+      bindChartTableToggle('btn-toggle-ss-cedante-chart', 'btn-toggle-ss-cedante-table', 'view-ss-cedante-chart', 'view-ss-cedante-table');
+      bindChartTableToggle('btn-toggle-ss-courtier-chart', 'btn-toggle-ss-courtier-table', 'view-ss-courtier-chart', 'view-ss-courtier-table');
     }
 
     // ==========================================
-    // FILTERS (FILTRE UNIQUE BRANCHE)
+    // FILTERS
     // ==========================================
     function setupFilters() {
+      const filterBranche = document.getElementById('filter-branche');
+      const btnReset = document.getElementById('btn-reset-filters');
+
       populateFilterOptions();
 
-      document.getElementById('filter-branche').addEventListener('change', applyFilters);
+      if (filterBranche) {
+        filterBranche.addEventListener('change', (e) => {
+          selectedBranche = e.target.value;
+          applyFilters();
+        });
+      }
 
-      document.getElementById('btn-reset-filters').addEventListener('click', () => {
-        document.getElementById('filter-branche').value = 'ALL';
-        applyFilters();
-        showToast('Filtre réinitialisé');
-      });
+      if (btnReset) {
+        btnReset.addEventListener('click', () => {
+          selectedBranche = '';
+          if (filterBranche) filterBranche.value = '';
+          applyFilters();
+          showToast('Filtre réinitialisé');
+        });
+      }
     }
 
     function populateFilterOptions() {
-      const brancheSet = new Set();
+      const filterBranche = document.getElementById('filter-branche');
+      if (!filterBranche) return;
+
+      const branches = new Set();
       allRecords.forEach(r => {
-        if (r.branche) brancheSet.add(r.branche);
+        if (r.branche) branches.add(r.branche);
       });
 
-      const selBranche = document.getElementById('filter-branche');
-      selBranche.innerHTML = '<option value="ALL">Toutes les branches (' + brancheSet.size + ')</option>';
-      Array.from(brancheSet).sort().forEach(b => {
+      const currentVal = filterBranche.value;
+      filterBranche.innerHTML = '<option value="">Toutes les branches (Global)</option>';
+      Array.from(branches).sort().forEach(b => {
         const count = allRecords.filter(r => r.branche === b).length;
-        selBranche.innerHTML += `<option value="${b}">${b} (${count})</option>`;
+        filterBranche.innerHTML += `<option value="${b}">${b} (${count} affaires)</option>`;
       });
-
-      document.getElementById('total-count-badge').textContent = allRecords.length;
+      filterBranche.value = currentVal;
     }
 
     function applyFilters() {
-      const selB = document.getElementById('filter-branche').value;
-
       filteredRecords = allRecords.filter(r => {
-        if (selB !== 'ALL' && r.branche !== selB) return false;
+        if (selectedBranche && r.branche !== selectedBranche) return false;
         return true;
       });
-
-      document.getElementById('filtered-count').textContent = filteredRecords.length;
       currentPage = 1;
       renderAll();
     }
 
-    // ==========================================
-    // MAIN RENDER CALL
-    // ==========================================
     function renderAll() {
       renderKPIs();
       renderVueSouscrite();
       renderVueSignee();
+      renderVueSansSuite();
       renderDataTable();
       updateTabBadges();
     }
 
     function updateTabBadges() {
-      const signedCountAll = allRecords.filter(r => r.etatBordereau === 'REÇU').length;
       const signedCountFiltered = filteredRecords.filter(r => r.etatBordereau === 'REÇU').length;
+      const ssCountFiltered = filteredRecords.filter(r => r.isSansSuite === true).length;
 
       const badgeSouscrite = document.getElementById('badge-tab-souscrite');
-      if (badgeSouscrite) {
-        badgeSouscrite.textContent = filteredRecords.length + ' affaires';
-      }
+      if (badgeSouscrite) badgeSouscrite.textContent = filteredRecords.length + ' affaires';
+
       const badgeSignee = document.getElementById('badge-tab-signee');
-      if (badgeSignee) {
-        badgeSignee.textContent = signedCountFiltered + ' bordereaux';
-      }
+      if (badgeSignee) badgeSignee.textContent = signedCountFiltered + ' bordereaux';
+
+      const badgeSansSuite = document.getElementById('badge-tab-sans-suite');
+      if (badgeSansSuite) badgeSansSuite.textContent = ssCountFiltered + ' sans suite';
+
       const badgeData = document.getElementById('badge-tab-data');
-      if (badgeData) {
-        badgeData.textContent = filteredRecords.length + ' polices';
-      }
+      if (badgeData) badgeData.textContent = (explorerExercice === '2026' ? filteredRecords.length : records2025.length) + ' polices';
+    }
+
+    // Helper pour générer un badge de variation (+X% vert / -X% rouge)
+    function formatVariationBadge(val26, val25) {
+      if (!val25 && !val26) return `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">0.0%</span>`;
+      if (!val25) return `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">+100%</span>`;
+      const pct = ((val26 - val25) / val25) * 100;
+      if (Math.abs(pct) < 0.05) return `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">0.0%</span>`;
+      const isPos = pct > 0;
+      const sign = isPos ? '+' : '';
+      const color = isPos ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-rose-100 text-rose-800 border border-rose-200';
+      return `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${color}">${sign}${pct.toFixed(1)}%</span>`;
     }
 
     // ==========================================
-    // 1. RENDER 5 PERMANENT KPIS (ÉTANCHÉITÉ STRICTE PRIME SIGNÉE)
+    // 1. RENDER 5 PERMANENT KPIS
     // ==========================================
     function renderKPIs() {
       const isSigneeMode = (currentTabId === 'tab-signee');
+      const isSansSuiteTab = (currentTabId === 'tab-sans-suite');
       const activeSubset = isSigneeMode 
         ? filteredRecords.filter(r => r.etatBordereau === 'REÇU')
         : filteredRecords;
@@ -1505,7 +1751,6 @@ html_template = """<!DOCTYPE html>
       document.getElementById('kpi-primes-scg').textContent = formatFCFA(totalPrimesSCG);
       document.getElementById('kpi-part-scg').textContent = formatPercent(partPrimesSCG);
 
-      // Label adaptatif sous la Prime SCG
       const subPrimeLabel = document.getElementById('kpi-sub-primes-scg-label');
       if (subPrimeLabel) {
         subPrimeLabel.textContent = isSigneeMode ? 'Part du 100% signé :' : 'Part du 100% :';
@@ -1525,18 +1770,66 @@ html_template = """<!DOCTYPE html>
       document.getElementById('kpi-primes-nettes').textContent = formatFCFA(totalPrimesNettes);
       document.getElementById('kpi-ratio-net').textContent = formatPercent(ratioNet);
 
-      // Mise à jour de la barre d'état du filtre (100% étanche pour Signée)
+      // GESTION DU COMPARATIF SOUS LES KPI (QUAND EN MODE COMPARATIF DANS L'ONGLET SIGNÉE)
+      const isComparatifActive = (isSigneeMode && signeeViewMode === 'comparatif');
+      const compIds = [
+        'kpi-comp-capitaux-100',
+        'kpi-comp-capitaux-scg',
+        'kpi-comp-primes-scg',
+        'kpi-comp-commissions',
+        'kpi-comp-primes-nettes'
+      ];
+
+      if (isComparatifActive) {
+        const active2025Signed = records2025.filter(r => r.etatBordereau === 'REÇU' && (!selectedBranche || r.branche === selectedBranche));
+        const c100_25 = active2025Signed.reduce((acc, r) => acc + (r.capitaux100 || 0), 0);
+        const cSCG_25 = active2025Signed.reduce((acc, r) => acc + (r.capitauxSCG || 0), 0);
+        const pSCG_25 = active2025Signed.reduce((acc, r) => acc + (r.primesSCG || 0), 0);
+        const comm_25 = active2025Signed.reduce((acc, r) => acc + (r.commission || 0), 0);
+        const pNet_25 = active2025Signed.reduce((acc, r) => acc + (r.primesNettes || 0), 0);
+
+        compIds.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.classList.remove('hidden');
+        });
+
+        document.getElementById('kpi-comp-val-capitaux-100').textContent = formatFCFA(c100_25);
+        document.getElementById('kpi-comp-badge-capitaux-100').innerHTML = formatVariationBadge(totalCapitaux100, c100_25);
+
+        document.getElementById('kpi-comp-val-capitaux-scg').textContent = formatFCFA(cSCG_25);
+        document.getElementById('kpi-comp-badge-capitaux-scg').innerHTML = formatVariationBadge(totalCapitauxSCG, cSCG_25);
+
+        document.getElementById('kpi-comp-val-primes-scg').textContent = formatFCFA(pSCG_25);
+        document.getElementById('kpi-comp-badge-primes-scg').innerHTML = formatVariationBadge(totalPrimesSCG, pSCG_25);
+
+        document.getElementById('kpi-comp-val-commissions').textContent = formatFCFA(comm_25);
+        document.getElementById('kpi-comp-badge-commissions').innerHTML = formatVariationBadge(totalCommissions, comm_25);
+
+        document.getElementById('kpi-comp-val-primes-nettes').textContent = formatFCFA(pNet_25);
+        document.getElementById('kpi-comp-badge-primes-nettes').innerHTML = formatVariationBadge(totalPrimesNettes, pNet_25);
+      } else {
+        compIds.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.classList.add('hidden');
+        });
+      }
+
+      // Filter status bar text
       const filterStatusEl = document.getElementById('filter-status-text');
       if (filterStatusEl) {
         if (isSigneeMode) {
           const totalSignedBase = allRecords.filter(r => r.etatBordereau === 'REÇU').length;
           filterStatusEl.innerHTML = `Affichage de <span class="font-bold text-emerald-600">${activeSubset.length}</span> bordereaux reçus sur <span class="font-bold">${totalSignedBase}</span>`;
+        } else if (isSansSuiteTab) {
+          const totalSSBase = allRecords.filter(r => r.isSansSuite === true).length;
+          const currentSS = filteredRecords.filter(r => r.isSansSuite === true).length;
+          filterStatusEl.innerHTML = `Affichage de <span class="font-bold text-rose-600">${currentSS}</span> affaires sans suite sur <span class="font-bold">${totalSSBase}</span>`;
         } else {
           filterStatusEl.innerHTML = `Affichage de <span class="font-bold text-brand-600">${filteredRecords.length}</span> affaires sur <span class="font-bold">${allRecords.length}</span>`;
         }
       }
 
-      document.getElementById('header-records-count').textContent = allRecords.length + ' affaires chargées';
+      document.getElementById('header-records-count').textContent = allRecords.length + ' affaires 2026 chargées';
     }
 
     // Helper d'agrégation retournant une liste d'objets { name, amount, count }
@@ -1551,6 +1844,42 @@ html_template = """<!DOCTYPE html>
       return Object.entries(map)
         .map(([name, data]) => ({ name, amount: data.amount, count: data.count }))
         .sort((a, b) => b.amount - a.amount);
+    }
+
+    // Helper d'agrégation comparative 2025 vs 2026
+    function aggregateComparative(records26, records25, keyExtractor) {
+      const map = {};
+      records26.forEach(r => {
+        const k = keyExtractor(r);
+        if (!map[k]) map[k] = { name: k, amount2026: 0, count2026: 0, amount2025: 0, count2025: 0 };
+        map[k].amount2026 += (r.primesSCG || 0);
+        map[k].count2026 += 1;
+      });
+      records25.forEach(r => {
+        const k = keyExtractor(r);
+        if (!map[k]) map[k] = { name: k, amount2026: 0, count2026: 0, amount2025: 0, count2025: 0 };
+        map[k].amount2025 += (r.primesSCG || 0);
+        map[k].count2025 += 1;
+      });
+      const list = Object.values(map);
+      list.sort((a, b) => (b.amount2026 - a.amount2026) || (b.amount2025 - a.amount2025) || a.name.localeCompare(b.name));
+      list.forEach(item => {
+        item.delta = item.amount2026 - item.amount2025;
+        item.growthPct = item.amount2025 > 0 ? ((item.amount2026 - item.amount2025) / item.amount2025) * 100 : (item.amount2026 > 0 ? 100 : 0);
+      });
+      return list;
+    }
+
+    // Helper d'agrégation par somme d'une colonne spécifique (ex: primes100 pour sans suite)
+    function aggregateBySum(records, keyExtractor, valExtractor) {
+      const map = {};
+      records.forEach(r => {
+        const k = keyExtractor(r);
+        if (!map[k]) map[k] = { name: k, amount: 0, count: 0 };
+        map[k].amount += valExtractor(r);
+        map[k].count += 1;
+      });
+      return Object.values(map).sort((a, b) => b.amount - a.amount);
     }
 
     // ==========================================
@@ -1607,16 +1936,35 @@ html_template = """<!DOCTYPE html>
     }
 
     // ==========================================
-    // 3. VUE PRIME SIGNÉE (BORDEREAUX REÇUS)
+    // 3. VUE PRIME SIGNÉE (AVEC MODE COMPARATIF 2025 vs 2026)
     // ==========================================
     function renderVueSignee() {
+      if (signeeViewMode === 'comparatif') {
+        renderVueSigneeComparative();
+      } else {
+        renderVueSigneeStandard();
+      }
+    }
+
+    function renderVueSigneeStandard() {
       const records = filteredRecords.filter(r => r.etatBordereau === 'REÇU');
       const totalSignee = records.reduce((acc, r) => acc + (r.primesSCG || 0), 0);
 
       document.getElementById('badge-signee-count').textContent = records.length + ' bordereaux reçus';
       document.getElementById('badge-signee-total').textContent = 'Total : ' + formatFCFA(totalSignee);
 
-      // --- A. Prime signée par Branche ---
+      document.getElementById('sub-signee-branche').textContent = 'Bordereaux reçus — Tri décroissant (FCFA)';
+      document.getElementById('sub-signee-pays').textContent = 'Lieu du risque — Tri décroissant (FCFA)';
+      document.getElementById('sub-signee-cedante').textContent = 'Groupes consolidés — Ordre décroissant';
+      document.getElementById('sub-signee-courtier').textContent = 'Apporteurs standardisés — Ordre décroissant';
+
+      // Reset Table Heads to Standard
+      resetStandardTableHead('table-signee-branche-head', 'Branche');
+      resetStandardTableHead('table-signee-pays-head', 'Pays');
+      resetStandardTableHead('table-signee-cedante-head', 'Cédante (Groupe)');
+      resetStandardTableHead('table-signee-courtier-head', 'Courtier / Apporteur');
+
+      // --- A. Branche ---
       const sortedBranches = aggregateBy(records, r => r.branche || 'AUTRES');
       document.getElementById('count-branches-signee').textContent = sortedBranches.length + ' branches';
       renderHorizontalBarChart('chart-signee-branche', {
@@ -1627,7 +1975,7 @@ html_template = """<!DOCTYPE html>
       });
       renderRankedTable('table-signee-branche-body', sortedBranches, totalSignee, 'bordereaux', 'bg-emerald-600');
 
-      // --- B. Prime signée par Pays ---
+      // --- B. Pays ---
       const sortedPays = aggregateBy(records, r => r.pays || 'NON DÉFINI');
       document.getElementById('count-pays-signee').textContent = sortedPays.length + ' pays';
       renderHorizontalBarChart('chart-signee-pays', {
@@ -1638,7 +1986,7 @@ html_template = """<!DOCTYPE html>
       });
       renderRankedTable('table-signee-pays-body', sortedPays, totalSignee, 'bordereaux', 'bg-teal-600');
 
-      // --- C. Prime signée par Cédante (Groupes standardisés) ---
+      // --- C. Cédante ---
       const sortedCedantes = aggregateBy(records, r => r.cedante || 'NON DÉFINI');
       const top10Cedantes = sortedCedantes.slice(0, 10);
       renderHorizontalBarChart('chart-signee-cedante', {
@@ -1649,7 +1997,7 @@ html_template = """<!DOCTYPE html>
       });
       renderRankedTable('table-signee-cedante-body', sortedCedantes, totalSignee, 'bordereaux', 'bg-cyan-600');
 
-      // --- D. Prime signée par Courtier / Apporteur ---
+      // --- D. Courtier ---
       const sortedCourtiers = aggregateBy(records, r => r.apporteur || 'NON SPÉCIFIÉ');
       const top10Courtiers = sortedCourtiers.slice(0, 10);
       renderHorizontalBarChart('chart-signee-courtier', {
@@ -1660,13 +2008,72 @@ html_template = """<!DOCTYPE html>
       });
       renderRankedTable('table-signee-courtier-body', sortedCourtiers, totalSignee, 'bordereaux', 'bg-emerald-600');
 
-      // --- E. Top 10 des Affaires Signées ---
+      // --- E. Top 10 Affaires Signées ---
       renderTop10AffairesSignees();
     }
 
+    function renderVueSigneeComparative() {
+      const records26 = filteredRecords.filter(r => r.etatBordereau === 'REÇU');
+      const records25 = records2025.filter(r => r.etatBordereau === 'REÇU' && (!selectedBranche || r.branche === selectedBranche));
+
+      const totalSignee26 = records26.reduce((acc, r) => acc + (r.primesSCG || 0), 0);
+      const totalSignee25 = records25.reduce((acc, r) => acc + (r.primesSCG || 0), 0);
+      const deltaTotal = totalSignee26 - totalSignee25;
+      const pctTotal = totalSignee25 > 0 ? (deltaTotal / totalSignee25) * 100 : 0;
+      const sign = pctTotal > 0 ? '+' : '';
+
+      document.getElementById('badge-signee-count').textContent = `${records26.length} bordereaux (2026) vs ${records25.length} (2025)`;
+      document.getElementById('badge-signee-total').textContent = `2026 : ${formatFCFA(totalSignee26)} | 2025 : ${formatFCFA(totalSignee25)} (${sign}${pctTotal.toFixed(1)}%)`;
+
+      document.getElementById('sub-signee-branche').textContent = 'Comparatif 2026 vs 2025 avec variation (%)';
+      document.getElementById('sub-signee-pays').textContent = 'Comparatif 2026 vs 2025 avec variation (%)';
+      document.getElementById('sub-signee-cedante').textContent = 'Comparatif 2026 vs 2025 avec variation (%)';
+      document.getElementById('sub-signee-courtier').textContent = 'Comparatif 2026 vs 2025 avec variation (%)';
+
+      // --- A. Branche Comparatif ---
+      const compBranches = aggregateComparative(records26, records25, r => r.branche || 'AUTRES');
+      document.getElementById('count-branches-signee').textContent = compBranches.length + ' branches';
+      renderComparativeHorizontalBarChart('chart-signee-branche', compBranches);
+      renderComparativeRankedTable('table-signee-branche-body', 'table-signee-branche-head', compBranches, 'Branche');
+
+      // --- B. Pays Comparatif ---
+      const compPays = aggregateComparative(records26, records25, r => r.pays || 'NON DÉFINI');
+      document.getElementById('count-pays-signee').textContent = compPays.length + ' pays';
+      renderComparativeHorizontalBarChart('chart-signee-pays', compPays);
+      renderComparativeRankedTable('table-signee-pays-body', 'table-signee-pays-head', compPays, 'Pays');
+
+      // --- C. Cédante Comparatif ---
+      const compCedantes = aggregateComparative(records26, records25, r => r.cedante || 'NON DÉFINI');
+      document.getElementById('count-cedantes-signee').textContent = compCedantes.length + ' groupes';
+      renderComparativeHorizontalBarChart('chart-signee-cedante', compCedantes.slice(0, 10));
+      renderComparativeRankedTable('table-signee-cedante-body', 'table-signee-cedante-head', compCedantes, 'Cédante (Groupe)');
+
+      // --- D. Courtier Comparatif ---
+      const compCourtiers = aggregateComparative(records26, records25, r => r.apporteur || 'NON SPÉCIFIÉ');
+      document.getElementById('count-courtiers-signee').textContent = compCourtiers.length + ' apporteurs';
+      renderComparativeHorizontalBarChart('chart-signee-courtier', compCourtiers.slice(0, 10));
+      renderComparativeRankedTable('table-signee-courtier-body', 'table-signee-courtier-head', compCourtiers, 'Courtier / Apporteur');
+
+      // Top 10 Signées
+      renderTop10AffairesSignees();
+    }
+
+    function resetStandardTableHead(theadId, labelCol) {
+      const thead = document.getElementById(theadId);
+      if (!thead) return;
+      thead.innerHTML = `
+        <tr>
+          <th class="py-2 px-3 text-center w-12">Rang</th>
+          <th class="py-2 px-3">${labelCol}</th>
+          <th class="py-2 px-3 text-right">Prime SCG-Ré</th>
+          <th class="py-2 px-3 text-center">Bordereaux</th>
+          <th class="py-2 px-3 text-right">Part (%)</th>
+        </tr>
+      `;
+    }
+
     // ==========================================
-    // REUSABLE HORIZONTAL BAR CHART BUILDER
-    // Avec montants au-dessus / au bout des barres
+    // REUSABLE CHARTS & TABLES
     // ==========================================
     function renderHorizontalBarChart(canvasId, config) {
       const { labels, values, color, datasetLabel } = config;
@@ -1696,12 +2103,7 @@ html_template = """<!DOCTYPE html>
           responsive: true,
           maintainAspectRatio: false,
           layout: {
-            padding: {
-              right: 65, // Espace réservé pour l'étiquette au bout de la barre
-              left: 5,
-              top: 5,
-              bottom: 5
-            }
+            padding: { right: 65, left: 5, top: 5, bottom: 5 }
           },
           plugins: {
             legend: { display: false },
@@ -1715,15 +2117,8 @@ html_template = """<!DOCTYPE html>
               align: 'right',
               offset: 4,
               color: '#334155',
-              font: {
-                size: 10,
-                weight: '700',
-                family: 'Plus Jakarta Sans'
-              },
-              formatter: (val) => {
-                if (!val || val === 0) return '';
-                return formatBarValue(val);
-              }
+              font: { size: 10, weight: '700', family: 'Plus Jakarta Sans' },
+              formatter: (val) => (!val || val === 0 ? '' : formatBarValue(val))
             }
           },
           scales: {
@@ -1749,7 +2144,99 @@ html_template = """<!DOCTYPE html>
       });
     }
 
-    // Helper complet pour remplir les tableaux complets classés (Branche, Pays, Cédante, Courtier)
+    function renderComparativeHorizontalBarChart(canvasId, list) {
+      const ctx = document.getElementById(canvasId);
+      if (!ctx) return;
+
+      if (charts[canvasId]) {
+        charts[canvasId].destroy();
+      }
+
+      const topItems = list.slice(0, 10);
+      const labels = topItems.map(x => x.name);
+      const values26 = topItems.map(x => x.amount2026);
+      const values25 = topItems.map(x => x.amount2025);
+      const maxVal = Math.max(...values26, ...values25, 0);
+
+      charts[canvasId] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: '2026',
+              data: values26,
+              backgroundColor: '#059669',
+              borderRadius: 4,
+              borderSkipped: false,
+              barPercentage: 0.8,
+              categoryPercentage: 0.8
+            },
+            {
+              label: '2025',
+              data: values25,
+              backgroundColor: '#64748b',
+              borderRadius: 4,
+              borderSkipped: false,
+              barPercentage: 0.8,
+              categoryPercentage: 0.8
+            }
+          ]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {
+            padding: { right: 70, left: 5, top: 5, bottom: 5 }
+          },
+          plugins: {
+            legend: {
+              display: true,
+              position: 'top',
+              align: 'end',
+              labels: {
+                boxWidth: 12,
+                font: { size: 11, weight: '700', family: 'Plus Jakarta Sans' }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.dataset.label} : ${formatFCFA(ctx.raw)}`
+              }
+            },
+            datalabels: {
+              anchor: 'end',
+              align: 'right',
+              offset: 3,
+              color: '#334155',
+              font: { size: 9, weight: '700', family: 'Plus Jakarta Sans' },
+              formatter: (val) => (!val || val === 0 ? '' : formatBarValue(val))
+            }
+          },
+          scales: {
+            x: {
+              suggestedMax: maxVal > 0 ? maxVal * 1.15 : 100,
+              grid: { color: '#f1f5f9' },
+              ticks: {
+                font: { size: 10 },
+                color: '#64748b',
+                callback: (v) => formatBarValue(v)
+              }
+            },
+            y: {
+              grid: { display: false },
+              ticks: {
+                font: { size: 10, weight: '600' },
+                color: '#334155',
+                autoSkip: false
+              }
+            }
+          }
+        }
+      });
+    }
+
     function renderRankedTable(tbodyId, sortedList, total, countLabel, colorClass) {
       const tbody = document.getElementById(tbodyId);
       if (!tbody) return;
@@ -1800,9 +2287,59 @@ html_template = """<!DOCTYPE html>
       }).join('');
     }
 
-    // ==========================================
-    // TOP 10 DES AFFAIRES SIGNÉES (BORDEREAUX REÇUS)
-    // ==========================================
+    function renderComparativeRankedTable(tbodyId, theadId, list, colLabel) {
+      const thead = document.getElementById(theadId);
+      if (thead) {
+        thead.innerHTML = `
+          <tr>
+            <th class="py-2 px-3 text-center w-10">Rang</th>
+            <th class="py-2 px-3">${colLabel}</th>
+            <th class="py-2 px-3 text-right text-emerald-800">Prime 2026</th>
+            <th class="py-2 px-3 text-right text-slate-600">Prime 2025</th>
+            <th class="py-2 px-3 text-right text-slate-700">Évolution</th>
+            <th class="py-2 px-3 text-center">Variation</th>
+            <th class="py-2 px-3 text-center">Bordereaux (26 vs 25)</th>
+          </tr>
+        `;
+      }
+
+      const tbody = document.getElementById(tbodyId);
+      if (!tbody) return;
+
+      if (!list || list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="py-6 text-center text-slate-400 font-medium">Aucune donnée comparative</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = list.map((item, idx) => {
+        const rank = idx + 1;
+        let rankBadge = `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-slate-500 font-bold text-xs">${rank}</span>`;
+        if (rank === 1) rankBadge = `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 font-extrabold text-xs shadow-xs">1</span>`;
+        else if (rank === 2) rankBadge = `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-200 text-slate-700 border border-slate-300 font-extrabold text-xs shadow-xs">2</span>`;
+        else if (rank === 3) rankBadge = `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-700/10 text-amber-900 border border-amber-600/30 font-extrabold text-xs shadow-xs">3</span>`;
+
+        const badge = formatVariationBadge(item.amount2026, item.amount2025);
+        const deltaSign = item.delta > 0 ? '+' : '';
+        const deltaColor = item.delta > 0 ? 'text-emerald-700 font-bold' : (item.delta < 0 ? 'text-rose-700 font-bold' : 'text-slate-500');
+
+        return `
+          <tr class="hover:bg-slate-50/80 transition-colors">
+            <td class="py-2.5 px-3 font-bold text-center">${rankBadge}</td>
+            <td class="py-2.5 px-3 font-semibold text-slate-800">
+              <div class="truncate max-w-[180px]" title="${item.name}">${item.name}</div>
+            </td>
+            <td class="py-2.5 px-3 font-extrabold text-right text-emerald-800 whitespace-nowrap">${formatFCFA(item.amount2026)}</td>
+            <td class="py-2.5 px-3 font-medium text-right text-slate-600 whitespace-nowrap">${formatFCFA(item.amount2025)}</td>
+            <td class="py-2.5 px-3 text-right whitespace-nowrap text-xs ${deltaColor}">${deltaSign}${formatFCFA(item.delta)}</td>
+            <td class="py-2.5 px-3 text-center whitespace-nowrap">${badge}</td>
+            <td class="py-2.5 px-3 text-center whitespace-nowrap">
+              <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200/60">${item.count2026} vs ${item.count2025}</span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
     function renderTop10AffairesSignees() {
       const tbody = document.getElementById('table-signee-top10-body');
       if (!tbody) return;
@@ -1828,66 +2365,257 @@ html_template = """<!DOCTYPE html>
 
       tbody.innerHTML = top10.map((r, idx) => {
         const rank = idx + 1;
-        let rankBadge = `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-600 font-bold text-xs">${rank}</span>`;
-        if (rank === 1) {
-          rankBadge = `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-800 border border-amber-300 font-extrabold text-xs shadow-xs" title="1er rang">🥇 1</span>`;
-        } else if (rank === 2) {
-          rankBadge = `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-200 text-slate-800 border border-slate-300 font-extrabold text-xs shadow-xs" title="2e rang">🥈 2</span>`;
-        } else if (rank === 3) {
-          rankBadge = `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-700/10 text-amber-900 border border-amber-600/30 font-extrabold text-xs shadow-xs" title="3e rang">🥉 3</span>`;
-        }
-
-        const tauxCessionVal = (r.tauxCession && r.tauxCession > 0) 
-          ? (r.tauxCession > 1 ? r.tauxCession : r.tauxCession * 100).toFixed(2) + '%'
-          : (r.primes100 > 0 ? ((r.primesSCG / r.primes100) * 100).toFixed(2) + '%' : '-');
+        let rankBadge = `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-slate-500 font-bold text-xs">${rank}</span>`;
+        if (rank === 1) rankBadge = `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 font-extrabold text-xs shadow-xs">1</span>`;
+        else if (rank === 2) rankBadge = `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-200 text-slate-700 border border-slate-300 font-extrabold text-xs shadow-xs">2</span>`;
+        else if (rank === 3) rankBadge = `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-700/10 text-amber-900 border border-amber-600/30 font-extrabold text-xs shadow-xs">3</span>`;
 
         return `
           <tr class="hover:bg-emerald-50/40 transition-colors">
-            <td class="py-3 px-3 text-center whitespace-nowrap">${rankBadge}</td>
-            <td class="py-3 px-3 font-bold text-slate-900">
-              <div class="truncate max-w-[260px]" title="${r.affaire || ''}">${r.affaire || 'NON SPÉCIFIÉ'}</div>
-              <div class="text-[10px] font-semibold text-slate-500 mt-0.5 flex items-center gap-1.5">
-                <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                <span>${r.branche || 'AUTRES'}</span>
-                <span>•</span>
-                <span>${r.pays || ''}</span>
-              </div>
+            <td class="py-2.5 px-3 font-bold text-center">${rankBadge}</td>
+            <td class="py-2.5 px-3 font-extrabold text-slate-900">
+              <div class="truncate max-w-[220px]" title="${r.affaire}">${r.affaire}</div>
             </td>
-            <td class="py-3 px-3 font-medium text-slate-700">
-              <div class="truncate max-w-[170px]" title="${r.cedante || ''}">${r.cedante || 'NON SPÉCIFIÉ'}</div>
+            <td class="py-2.5 px-3 font-semibold text-slate-700">
+              <div class="truncate max-w-[160px]" title="${r.cedante}">${r.cedante}</div>
             </td>
-            <td class="py-3 px-3 font-medium text-slate-700">
-              <div class="truncate max-w-[170px]" title="${r.apporteur || ''}">${r.apporteur || 'NON SPÉCIFIÉ'}</div>
+            <td class="py-2.5 px-3 text-slate-600">
+              <div class="truncate max-w-[140px]" title="${r.apporteur}">${r.apporteur}</div>
             </td>
-            <td class="py-3 px-3 font-semibold text-right text-slate-700 whitespace-nowrap">${formatFCFA(r.capitaux100 || 0)}</td>
-            <td class="py-3 px-3 font-semibold text-right text-slate-700 whitespace-nowrap">${formatFCFA(r.primes100 || 0)}</td>
-            <td class="py-3 px-3 font-bold text-right text-brand-700 whitespace-nowrap">${tauxCessionVal}</td>
-            <td class="py-3 px-3 font-semibold text-right text-purple-900 whitespace-nowrap">${formatFCFA(r.capitauxSCG || 0)}</td>
-            <td class="py-3 px-3 font-extrabold text-right text-emerald-700 text-sm whitespace-nowrap bg-emerald-50/60">${formatFCFA(r.primesSCG || 0)}</td>
+            <td class="py-2.5 px-3 text-slate-600 whitespace-nowrap">${r.branche || '-'}</td>
+            <td class="py-2.5 px-3 text-right font-medium text-slate-600 whitespace-nowrap">${formatFCFA(r.capitaux100)}</td>
+            <td class="py-2.5 px-3 text-right font-medium text-slate-600 whitespace-nowrap">${formatFCFA(r.primes100)}</td>
+            <td class="py-2.5 px-3 text-center whitespace-nowrap">
+              <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700">${formatPercent(r.tauxCession)}</span>
+            </td>
+            <td class="py-2.5 px-3 text-right font-black text-emerald-700 whitespace-nowrap text-sm bg-emerald-50/50">${formatFCFA(r.primesSCG)}</td>
           </tr>
         `;
       }).join('');
     }
 
     // ==========================================
-    // 4. DATA EXPLORER & EXPORT (ONGLET 3)
+    // 4. VUE AFFAIRES SANS SUITE (EXERCICE 2026)
+    // ==========================================
+    function renderVueSansSuite() {
+      const ssRecords = filteredRecords.filter(r => r.isSansSuite === true);
+      const totalPrimes100 = ssRecords.reduce((acc, r) => acc + (r.primes100 || 0), 0);
+      const totalCapitaux100 = ssRecords.reduce((acc, r) => acc + (r.capitaux100 || 0), 0);
+      const total2026Affaires = filteredRecords.length;
+      const total2026Primes100 = filteredRecords.reduce((acc, r) => acc + (r.primes100 || 0), 0);
+      const tauxDeperditionNombre = total2026Affaires > 0 ? ((ssRecords.length / total2026Affaires) * 100) : 0;
+      const tauxDeperditionPrime = total2026Primes100 > 0 ? ((totalPrimes100 / total2026Primes100) * 100) : 0;
+      const moyPrime = ssRecords.length > 0 ? (totalPrimes100 / ssRecords.length) : 0;
+
+      // Banner badges
+      const bCount = document.getElementById('badge-sans-suite-count');
+      if (bCount) bCount.textContent = `${ssRecords.length} affaires sans suite`;
+      const bTotal = document.getElementById('badge-sans-suite-total');
+      if (bTotal) bTotal.textContent = `Primes 100% : ${formatFCFA(totalPrimes100)}`;
+
+      // 4 KPIs
+      const elCount = document.getElementById('kpi-ss-count');
+      if (elCount) elCount.textContent = ssRecords.length;
+      const elTaux = document.getElementById('kpi-ss-taux-deperdition');
+      if (elTaux) elTaux.textContent = `${tauxDeperditionNombre.toFixed(1)}%`;
+
+      const elPrimes = document.getElementById('kpi-ss-primes-100');
+      if (elPrimes) elPrimes.textContent = formatFCFA(totalPrimes100);
+      const elTauxPrime = document.getElementById('kpi-ss-taux-prime');
+      if (elTauxPrime) elTauxPrime.textContent = `${tauxDeperditionPrime.toFixed(1)}%`;
+
+      const elCapitaux = document.getElementById('kpi-ss-capitaux-100');
+      if (elCapitaux) elCapitaux.textContent = formatFCFA(totalCapitaux100);
+
+      const elMoy = document.getElementById('kpi-ss-moyenne-prime');
+      if (elMoy) elMoy.textContent = formatFCFA(moyPrime);
+
+      // --- A. Branche Sans Suite ---
+      const sortedBranches = aggregateBySum(ssRecords, r => r.branche || 'AUTRES', r => r.primes100 || 0);
+      document.getElementById('count-branches-ss').textContent = `${sortedBranches.length} branches`;
+      renderHorizontalBarChart('chart-ss-branche', {
+        labels: sortedBranches.map(x => x.name),
+        values: sortedBranches.map(x => x.amount),
+        color: '#e11d48',
+        datasetLabel: 'Primes 100% sans suite'
+      });
+      renderRankedTable('table-ss-branche-body', sortedBranches, totalPrimes100, 'affaires', 'bg-rose-600');
+
+      // --- B. Pays Sans Suite ---
+      const sortedPays = aggregateBySum(ssRecords, r => r.pays || 'NON DÉFINI', r => r.primes100 || 0);
+      document.getElementById('count-pays-ss').textContent = `${sortedPays.length} pays`;
+      renderHorizontalBarChart('chart-ss-pays', {
+        labels: sortedPays.map(x => x.name),
+        values: sortedPays.map(x => x.amount),
+        color: '#f43f5e',
+        datasetLabel: 'Primes 100% sans suite'
+      });
+      renderRankedTable('table-ss-pays-body', sortedPays, totalPrimes100, 'affaires', 'bg-rose-500');
+
+      // --- C. Cédante Sans Suite ---
+      const sortedCedantes = aggregateBySum(ssRecords, r => r.cedante || 'NON DÉFINI', r => r.primes100 || 0);
+      document.getElementById('count-cedantes-ss').textContent = `${sortedCedantes.length} groupes`;
+      renderHorizontalBarChart('chart-ss-cedante', {
+        labels: sortedCedantes.slice(0, 10).map(x => x.name),
+        values: sortedCedantes.slice(0, 10).map(x => x.amount),
+        color: '#d97706',
+        datasetLabel: 'Primes 100% sans suite'
+      });
+      renderRankedTable('table-ss-cedante-body', sortedCedantes, totalPrimes100, 'affaires', 'bg-amber-600');
+
+      // --- D. Courtier Sans Suite ---
+      const sortedCourtiers = aggregateBySum(ssRecords, r => r.apporteur || 'NON SPÉCIFIÉ', r => r.primes100 || 0);
+      document.getElementById('count-courtiers-ss').textContent = `${sortedCourtiers.length} apporteurs`;
+      renderHorizontalBarChart('chart-ss-courtier', {
+        labels: sortedCourtiers.slice(0, 10).map(x => x.name),
+        values: sortedCourtiers.slice(0, 10).map(x => x.amount),
+        color: '#ea580c',
+        datasetLabel: 'Primes 100% sans suite'
+      });
+      renderRankedTable('table-ss-courtier-body', sortedCourtiers, totalPrimes100, 'affaires', 'bg-orange-600');
+
+      // Detailed Table
+      renderDetailedSansSuiteTable(ssRecords);
+    }
+
+    function setupSansSuiteControls() {
+      const inputSearch = document.getElementById('input-search-ss');
+      if (inputSearch) {
+        inputSearch.addEventListener('input', (e) => {
+          searchSS = e.target.value.toLowerCase().trim();
+          const ssRecords = filteredRecords.filter(r => r.isSansSuite === true);
+          renderDetailedSansSuiteTable(ssRecords);
+        });
+      }
+
+      const btnExport = document.getElementById('btn-export-ss');
+      if (btnExport) {
+        btnExport.addEventListener('click', () => {
+          const ssRecords = filteredRecords.filter(r => r.isSansSuite === true);
+          exportSansSuiteExcel(ssRecords);
+        });
+      }
+    }
+
+    function renderDetailedSansSuiteTable(ssRecords) {
+      const tbody = document.getElementById('table-sans-suite-detailed-body');
+      if (!tbody) return;
+
+      let list = [...ssRecords];
+      if (searchSS) {
+        list = list.filter(r => 
+          (r.affaire && r.affaire.toLowerCase().includes(searchSS)) ||
+          (r.cedante && r.cedante.toLowerCase().includes(searchSS)) ||
+          (r.apporteur && r.apporteur.toLowerCase().includes(searchSS)) ||
+          (r.branche && r.branche.toLowerCase().includes(searchSS)) ||
+          (r.pays && r.pays.toLowerCase().includes(searchSS)) ||
+          (r.commentaires && r.commentaires.toLowerCase().includes(searchSS))
+        );
+      }
+
+      // Tri par Prime 100% décroissante
+      list.sort((a, b) => (b.primes100 || 0) - (a.primes100 || 0));
+
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="py-6 text-center text-slate-400 font-medium">Aucune affaire classée sans suite trouvée</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = list.map(r => {
+        return `
+          <tr class="hover:bg-rose-50/40 transition-colors">
+            <td class="py-2.5 px-3 font-semibold text-slate-500 text-center">${r.id}</td>
+            <td class="py-2.5 px-3 text-slate-600 whitespace-nowrap">${r.dateSouscription || '-'}</td>
+            <td class="py-2.5 px-3 font-bold text-slate-900">
+              <div class="truncate max-w-[200px]" title="${r.affaire}">${r.affaire}</div>
+            </td>
+            <td class="py-2.5 px-3 font-medium text-slate-700">
+              <div class="truncate max-w-[160px]" title="${r.cedante}">${r.cedante}</div>
+            </td>
+            <td class="py-2.5 px-3 text-slate-600">
+              <div class="truncate max-w-[140px]" title="${r.apporteur}">${r.apporteur}</div>
+            </td>
+            <td class="py-2.5 px-3 text-slate-600 whitespace-nowrap">${r.branche || '-'}</td>
+            <td class="py-2.5 px-3 text-slate-600 whitespace-nowrap">${r.pays || '-'}</td>
+            <td class="py-2.5 px-3 text-right font-medium text-slate-700 whitespace-nowrap">${formatFCFA(r.capitaux100)}</td>
+            <td class="py-2.5 px-3 text-right font-bold text-amber-700 whitespace-nowrap bg-amber-50/40">${formatFCFA(r.primes100)}</td>
+            <td class="py-2.5 px-3">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                ${r.commentaires || 'CLASSEE SANS SUITE'}
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function exportSansSuiteExcel(ssRecords) {
+      if (!ssRecords || ssRecords.length === 0) {
+        alert("Aucune donnée à exporter.");
+        return;
+      }
+      const rows = ssRecords.map(r => ({
+        "N° ID": r.id,
+        "Exercice": r.exercice || 2026,
+        "Date Souscription": r.dateSouscription,
+        "Affaire": r.affaire,
+        "Cédante": r.cedante,
+        "Courtier": r.apporteur,
+        "Branche": r.branche,
+        "Pays": r.pays,
+        "Capitaux 100%": r.capitaux100,
+        "Primes 100%": r.primes100,
+        "Motif / Statut": r.commentaires || 'CLASSEE SANS SUITE'
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Affaires Sans Suite");
+      XLSX.writeFile(wb, "SCG_Re_Affaires_Sans_Suite_2026.xlsx");
+      showToast("Fichier Excel des affaires sans suite exporté !");
+    }
+
+    // ==========================================
+    // 5. DATA EXPLORER & EXPORT (ONGLET 4)
     // ==========================================
     function setupTableControls() {
-      document.getElementById('table-search').addEventListener('input', (e) => {
-        searchTerm = e.target.value.toLowerCase().trim();
-        currentPage = 1;
-        renderDataTable();
-      });
+      const searchInput = document.getElementById('table-search');
+      const pageSizeSelect = document.getElementById('table-page-size');
+      const btnExport = document.getElementById('btn-export-excel');
+      const btnPrev = document.getElementById('btn-page-prev');
+      const btnNext = document.getElementById('btn-page-next');
 
-      document.getElementById('table-page-size').addEventListener('change', (e) => {
-        pageSize = e.target.value === 'ALL' ? 999999 : parseInt(e.target.value);
-        currentPage = 1;
-        renderDataTable();
-      });
+      if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+          searchTerm = e.target.value.toLowerCase().trim();
+          currentPage = 1;
+          renderDataTable();
+        });
+      }
 
-      document.querySelectorAll('th[data-col]').forEach(th => {
+      if (pageSizeSelect) {
+        pageSizeSelect.addEventListener('change', (e) => {
+          pageSize = parseInt(e.target.value, 10);
+          currentPage = 1;
+          renderDataTable();
+        });
+      }
+
+      if (btnExport) {
+        btnExport.addEventListener('click', exportCurrentTable);
+      }
+
+      if (btnPrev) {
+        btnPrev.addEventListener('click', () => changePage(-1));
+      }
+
+      if (btnNext) {
+        btnNext.addEventListener('click', () => changePage(1));
+      }
+
+      // Column headers click-to-sort
+      document.querySelectorAll('#main-data-table thead th[data-sort]').forEach(th => {
         th.addEventListener('click', () => {
-          const col = th.getAttribute('data-col');
+          const col = th.getAttribute('data-sort');
           if (sortColumn === col) {
             sortDirection = -sortDirection;
           } else {
@@ -1897,13 +2625,15 @@ html_template = """<!DOCTYPE html>
           renderDataTable();
         });
       });
-
-      document.getElementById('btn-export-table').addEventListener('click', exportCurrentTable);
-      document.getElementById('btn-export-cleaned').addEventListener('click', exportCurrentTable);
     }
 
     function renderDataTable() {
-      let data = [...filteredRecords];
+      // Choix du dataset selon l'exercice sélectionné
+      let base = (explorerExercice === '2025') 
+        ? records2025.filter(r => !selectedBranche || r.branche === selectedBranche)
+        : filteredRecords;
+
+      let data = [...base];
 
       // Text search
       if (searchTerm) {
@@ -1914,11 +2644,12 @@ html_template = """<!DOCTYPE html>
                  (r.pays && r.pays.toLowerCase().includes(searchTerm)) ||
                  (r.branche && r.branche.toLowerCase().includes(searchTerm)) ||
                  (r.etatBordereau && r.etatBordereau.toLowerCase().includes(searchTerm)) ||
+                 (r.commentaires && r.commentaires.toLowerCase().includes(searchTerm)) ||
                  (r.id && r.id.toString().includes(searchTerm));
         });
       }
 
-      document.getElementById('table-records-found').textContent = data.length + ' polices trouvées';
+      document.getElementById('table-records-found').textContent = data.length + ' polices (' + explorerExercice + ')';
 
       // Sort
       data.sort((a, b) => {
@@ -1943,7 +2674,15 @@ html_template = """<!DOCTYPE html>
         tbody.innerHTML = '<tr><td colspan="12" class="py-6 text-center text-slate-400">Aucune police ne correspond aux filtres</td></tr>';
       } else {
         tbody.innerHTML = pagedData.map(r => {
-          const isRecu = (r.etatBordereau === 'REÇU');
+          let statusBadge = '';
+          if (r.isSansSuite) {
+            statusBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">SANS SUITE</span>`;
+          } else if (r.etatBordereau === 'REÇU') {
+            statusBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">SIGNÉE</span>`;
+          } else {
+            statusBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">EN ATTENTE</span>`;
+          }
+
           return `
             <tr class="hover:bg-slate-50 transition-colors">
               <td class="py-2.5 px-3 font-semibold text-slate-500">${r.id}</td>
@@ -1958,105 +2697,131 @@ html_template = """<!DOCTYPE html>
               <td class="py-2.5 px-3 font-medium text-right text-amber-700 whitespace-nowrap">${formatFCFA(r.commission)}</td>
               <td class="py-2.5 px-3 font-bold text-right text-emerald-700 whitespace-nowrap">${formatFCFA(r.primesNettes)}</td>
               <td class="py-2.5 px-3 text-center whitespace-nowrap">
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${isRecu ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
-                  ${r.etatBordereau || 'EN ATTENTE'}
-                </span>
+                ${statusBadge}
               </td>
             </tr>
           `;
         }).join('');
       }
 
-      // Pagination footer
+      // Update Pagination UI
+      const endIdx = Math.min(startIdx + pageSize, data.length);
       document.getElementById('table-pagination-info').textContent = 
-        `Affichage ${Math.min(data.length, startIdx + 1)} - ${Math.min(data.length, startIdx + pageSize)} sur ${data.length} polices`;
-
-      const btnContainer = document.getElementById('table-pagination-buttons');
-      btnContainer.innerHTML = `
-        <button onclick="changePage(1)" ${currentPage === 1 ? 'disabled class="opacity-40 cursor-not-allowed"' : ''} class="px-2 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 text-xs">«</button>
-        <button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled class="opacity-40 cursor-not-allowed"' : ''} class="px-2.5 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 text-xs">Précédent</button>
-        <span class="px-2 py-1 font-bold text-xs">Page ${currentPage} / ${totalPages}</span>
-        <button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled class="opacity-40 cursor-not-allowed"' : ''} class="px-2.5 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 text-xs">Suivant</button>
-        <button onclick="changePage(${totalPages})" ${currentPage === totalPages ? 'disabled class="opacity-40 cursor-not-allowed"' : ''} class="px-2.5 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 text-xs">»</button>
-      `;
+        data.length > 0 ? `Affichage de ${startIdx + 1} à ${endIdx} sur ${data.length} affaires (${explorerExercice})` : '0 affaire';
+      document.getElementById('table-current-page').textContent = `Page ${currentPage} / ${totalPages}`;
+      document.getElementById('btn-page-prev').disabled = (currentPage <= 1);
+      document.getElementById('btn-page-next').disabled = (currentPage >= totalPages);
     }
 
-    function changePage(p) {
-      currentPage = p;
+    function changePage(delta) {
+      currentPage += delta;
       renderDataTable();
     }
 
     function exportCurrentTable() {
-      const rows = filteredRecords.map(r => ({
-        'N°': r.id,
-        'Date Souscription': r.dateSouscription,
-        'Date Réception': r.dateReception,
-        'Délai Réception (Jours)': r.delaiReceptionJours,
-        'Affaire': r.affaire,
-        'Type Affaire': r.typeAffaire,
-        'Cédante (Groupe)': r.cedante,
-        'Courtier / Apporteur': r.apporteur,
-        'Pays': r.pays,
-        'Branche': r.branche,
-        'Capitaux 100%': r.capitaux100,
-        'Primes 100%': r.primes100,
-        'Engagement SCG-Ré': r.capitauxSCG,
-        'Prime SCG-Ré': r.primesSCG,
-        'Commission': r.commission,
-        'Prime Nette': r.primesNettes,
-        'État Bordereau': r.etatBordereau,
+      const base = (explorerExercice === '2025') 
+        ? records2025.filter(r => !selectedBranche || r.branche === selectedBranche)
+        : filteredRecords;
+
+      let data = [...base];
+      if (searchTerm) {
+        data = data.filter(r => {
+          return (r.affaire && r.affaire.toLowerCase().includes(searchTerm)) ||
+                 (r.cedante && r.cedante.toLowerCase().includes(searchTerm)) ||
+                 (r.apporteur && r.apporteur.toLowerCase().includes(searchTerm)) ||
+                 (r.pays && r.pays.toLowerCase().includes(searchTerm)) ||
+                 (r.branche && r.branche.toLowerCase().includes(searchTerm)) ||
+                 (r.etatBordereau && r.etatBordereau.toLowerCase().includes(searchTerm)) ||
+                 (r.id && r.id.toString().includes(searchTerm));
+        });
+      }
+
+      if (data.length === 0) {
+        alert('Aucune donnée à exporter.');
+        return;
+      }
+
+      const rows = data.map(r => ({
+        "ID": r.id,
+        "Exercice": r.exercice || (explorerExercice === '2025' ? 2025 : 2026),
+        "Date Souscription": r.dateSouscription,
+        "Date Réception Bordereau": r.dateReception,
+        "Délai (jours)": r.delaiReceptionJours,
+        "Affaire": r.affaire,
+        "Type Affaire": r.typeAffaire,
+        "Cédante": r.cedante,
+        "Courtier": r.apporteur,
+        "Pays": r.pays,
+        "Branche": r.branche,
+        "Capitaux 100%": r.capitaux100,
+        "Primes 100%": r.primes100,
+        "Capitaux SCG-Ré": r.capitauxSCG,
+        "Primes SCG-Ré": r.primesSCG,
+        "Commission": r.commission,
+        "Primes Nettes": r.primesNettes,
+        "État Bordereau": r.etatBordereau,
+        "Classée Sans Suite": r.isSansSuite ? "OUI" : "NON",
+        "Commentaires": r.commentaires
       }));
 
       const ws = XLSX.utils.json_to_sheet(rows);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Production_ARO_SCG_Re');
-      XLSX.writeFile(wb, 'SCG_Re_Production_ARO_Standardisee.xlsx');
-      showToast('Export Excel téléchargé avec succès !');
+      XLSX.utils.book_append_sheet(wb, ws, `Production_${explorerExercice}`);
+      XLSX.writeFile(wb, `SCG_Re_Production_${explorerExercice}_Export.xlsx`);
+      showToast(`Exportation Excel (${explorerExercice}) réussie !`);
     }
 
     // ==========================================
-    // 5. UPLOAD & STANDARDIZATION ENGINE (CLIENT-SIDE)
+    // PERSISTENCE CONTROLS & DOWNLOAD HTML
     // ==========================================
-    function setupUploadModal() {
-      const modal = document.getElementById('upload-modal');
-      const btnOpen = document.getElementById('btn-open-upload');
-      const btnClose = document.getElementById('btn-close-upload');
-      const dropZone = document.getElementById('drop-zone');
-      const fileInput = document.getElementById('file-input');
+    function setupStorageControls() {
+      const btnReset = document.getElementById('btn-reset-storage');
+      if (btnReset) {
+        btnReset.addEventListener('click', async () => {
+          if (confirm("Voulez-vous rétablir les données d'origine pré-intégrées ?")) {
+            await clearDatasetFromStorage();
+            allRecords = [...INITIAL_RECORDS_2026];
+            records2025 = [...INITIAL_RECORDS_2025];
+            filteredRecords = [...allRecords];
+            selectedBranche = '';
+            document.getElementById('filter-branche').value = '';
+            populateFilterOptions();
+            renderAll();
+            showToast("Données d'origine rétablies.");
+          }
+        });
+      }
 
-      btnOpen.addEventListener('click', () => modal.classList.remove('hidden'));
-      btnClose.addEventListener('click', () => modal.classList.add('hidden'));
-
-      dropZone.addEventListener('click', () => fileInput.click());
-
-      dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('border-brand-500', 'bg-brand-50/50');
-      });
-
-      dropZone.addEventListener('dragleave', () => {
-        dropZone.classList.remove('border-brand-500', 'bg-brand-50/50');
-      });
-
-      dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('border-brand-500', 'bg-brand-50/50');
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-          processExcelFile(e.dataTransfer.files[0]);
-        }
-      });
-
-      fileInput.addEventListener('change', (e) => {
-        if (e.target.files && e.target.files[0]) {
-          processExcelFile(e.target.files[0]);
-        }
-      });
+      const btnDownload = document.getElementById('btn-download-html');
+      if (btnDownload) {
+        btnDownload.addEventListener('click', downloadStandaloneHtml);
+      }
     }
 
-    // STANDARDIZATION FUNCTIONS IN JAVASCRIPT
+    function downloadStandaloneHtml() {
+      try {
+        let fullHtml = document.documentElement.outerHTML;
+        const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'index.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Fichier index.html complet téléchargé !');
+      } catch (err) {
+        alert("Erreur lors du téléchargement : " + err.message);
+      }
+    }
+
+    // ==========================================
+    // IN-BROWSER EXCEL IMPORT & CLEANING
+    // ==========================================
     function cleanBranchJS(b) {
       if (!b) return 'AUTRES';
-      let up = b.toString().replace(/\\u00a0/g, ' ').replace(/\\s+/g, ' ').trim().toUpperCase();
+      const up = String(b).replace(/\\u00a0/g, ' ').trim().toUpperCase();
       if (up.includes('DECENNALE') || up.includes('DÉCENNALE')) return 'RC DÉCENNALE';
       if (up.includes('INCENDIE')) return 'INCENDIE';
       if (up.includes('CIVILE')) return 'RESPONSABILITÉ CIVILE';
@@ -2071,9 +2836,9 @@ html_template = """<!DOCTYPE html>
       return up;
     }
 
-    function cleanCountryJS(c) {
-      if (!c) return 'NON DÉFINI';
-      let up = c.toString().replace(/\\u00a0/g, ' ').replace(/\\s+/g, ' ').trim().toUpperCase();
+    function cleanCountryJS(p) {
+      if (!p) return 'NON DÉFINI';
+      const up = String(p).replace(/\\u00a0/g, ' ').trim().toUpperCase();
       if (up.includes('COTE') || up.includes('CÔTE')) {
         if (up.includes('SENEGAL') || up.includes('SÉNÉGAL')) return "CÔTE D'IVOIRE / SÉNÉGAL";
         return "CÔTE D'IVOIRE";
@@ -2105,28 +2870,23 @@ html_template = """<!DOCTYPE html>
 
     function cleanApporteurJS(app) {
       if (!app) return 'NON SPÉCIFIÉ';
-      let s = app.toString().trim();
-      let up = s.toUpperCase();
+      const s = String(app).trim();
+      const up = s.toUpperCase();
       if (up.includes('GLUBUS')) return 'GLOBUS RE';
       if (up.includes('PREVEX')) return 'PREVEX RE';
-      if (up.includes('ATLAS REINSURANCE')) return 'ATLAS REINSURANCE CONSULTANTS';
+      if (up.includes('ATLAS REINSURANCE') || up === 'ARC') return 'ATLAS REINSURANCE CONSULTANTS';
       if (up === 'SBRE' || up === 'SB RE') return 'SB RE';
       if (up.includes('KLAPTON')) return 'KLAPTON AFRICA';
-      if (up === 'SUNU GROUP') return 'SUNU RE';
+      if (up === 'SUNU GROUP' || up.includes('SUNU REASSURANCE') || up.includes('SUNU RE')) return 'SUNU RE';
       return s;
     }
 
     function cleanCedanteJS(ced) {
-      if (!ced || ced.toString().trim() === '') return 'NON SPÉCIFIÉ';
-      let s = ced.toString().trim();
-      let up = s.toUpperCase();
+      if (!ced || String(ced).trim() === '') return 'NON SPÉCIFIÉ';
+      const s = String(ced).trim();
+      const up = s.toUpperCase();
       if (up === 'TBA') return 'TBA';
-      if (up.includes(',') || (up.includes('&') && !up.includes('ALLIANZ') && !up.includes('SANLAM'))) {
-        return 'CO-ASSURANCE / APÉRITEUR';
-      }
-      if (up.includes('SANLAMALLIANZ & AMSA') || up.includes('SANLAM ALLIANZ,AMSA')) {
-        return 'CO-ASSURANCE / APÉRITEUR';
-      }
+      if (up.includes(',') || (up.includes('&') && !up.includes('ALLIANZ') && !up.includes('SANLAM'))) return 'CO-ASSURANCE / APÉRITEUR';
       if (up.includes('SUNU')) return 'SUNU ASSURANCES';
       if (up.includes('GNA')) return 'GNA';
       if (up.includes('NSIA')) return 'NSIA';
@@ -2151,7 +2911,7 @@ html_template = """<!DOCTYPE html>
       if (up.includes('ASKIA')) return 'ASKIA ASSURANCES';
       if (up.includes('ENERALE') || up.includes('GÉNÉRALE')) return 'GÉNÉRALE DES ASSURANCES';
       if (up.includes("L'AFRICAINE")) return "L'AFRICAINE DES ASSURANCES";
-      if (up.includes('UNION DES ASSURANCES DU BURKINA') || up.includes('UAB')) return 'UAB';
+      if (up.includes('UAB')) return 'UAB';
       if (up.includes('ZITOUNA')) return 'ZITOUNA TAKAFUL';
       if (up.includes('BH')) return 'BH ASSURANCES';
       if (up.includes('GAT')) return 'GAT ASSURANCES';
@@ -2165,6 +2925,44 @@ html_template = """<!DOCTYPE html>
       return s;
     }
 
+    function isSansSuiteJS(comment) {
+      if (!comment) return false;
+      const norm = String(comment).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase();
+      return norm.includes('sans suite') || norm.includes('classe sans suite');
+    }
+
+    function setupUploadModal() {
+      const modal = document.getElementById('upload-modal');
+      const btnOpen = document.getElementById('btn-open-upload');
+      const btnClose = document.getElementById('btn-close-upload');
+      const btnCancel = document.getElementById('btn-cancel-upload');
+      const dropZone = document.getElementById('drop-zone');
+      const fileInput = document.getElementById('file-input');
+
+      if (btnOpen) btnOpen.addEventListener('click', () => modal.classList.remove('hidden'));
+      if (btnClose) btnClose.addEventListener('click', () => modal.classList.add('hidden'));
+      if (btnCancel) btnCancel.addEventListener('click', () => modal.classList.add('hidden'));
+
+      if (dropZone && fileInput) {
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+          if (e.target.files.length > 0) processExcelFile(e.target.files[0]);
+        });
+        dropZone.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          dropZone.classList.add('border-brand-600', 'bg-brand-100/50');
+        });
+        dropZone.addEventListener('dragleave', () => {
+          dropZone.classList.remove('border-brand-600', 'bg-brand-100/50');
+        });
+        dropZone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          dropZone.classList.remove('border-brand-600', 'bg-brand-100/50');
+          if (e.dataTransfer.files.length > 0) processExcelFile(e.dataTransfer.files[0]);
+        });
+      }
+    }
+
     function processExcelFile(file) {
       const reader = new FileReader();
       reader.onload = async function(e) {
@@ -2172,7 +2970,6 @@ html_template = """<!DOCTYPE html>
           const data = new Uint8Array(e.target.result);
           const workbook = XLSX.read(data, { type: 'array', cellDates: true });
           
-          // Chercher la feuille principale (ex: 'BASE 2026', 'BASE', ou la 1ère feuille)
           let targetSheetName = workbook.SheetNames[0];
           for (const name of workbook.SheetNames) {
             const upN = name.toUpperCase();
@@ -2182,15 +2979,12 @@ html_template = """<!DOCTYPE html>
             }
           }
           const sheet = workbook.Sheets[targetSheetName];
-
-          // Conversion en matrice brute de lignes
           const rawMatrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
           if (!rawMatrix || rawMatrix.length === 0) {
             alert('Le fichier Excel semble vide.');
             return;
           }
 
-          // Détection automatique intelligente de la ligne des en-têtes
           let headerIdx = -1;
           for (let i = 0; i < Math.min(50, rawMatrix.length); i++) {
             const row = rawMatrix[i];
@@ -2203,23 +2997,18 @@ html_template = """<!DOCTYPE html>
             }
           }
 
-          if (headerIdx === -1) {
-            headerIdx = 0;
-          }
-
+          if (headerIdx === -1) headerIdx = 0;
           const headers = rawMatrix[headerIdx].map(h => String(h || '').trim());
           
-          // Recherche insensible à la casse et à la ponctuation
-          // Priorise les matchs exacts, puis les matchs par inclusion
           const findColIdx = (...candidates) => {
             const normC = candidates.map(c => c.toLowerCase().replace(/[^a-z0-9]/g, ''));
-            // Phase 1: Match exact (normalisé)
+            // Exact pass
             const exactIdx = headers.findIndex(h => {
               const normH = h.toLowerCase().replace(/[^a-z0-9]/g, '');
               return normC.some(c => normH === c);
             });
             if (exactIdx !== -1) return exactIdx;
-            // Phase 2: Match par inclusion
+            // Inclusion pass
             return headers.findIndex(h => {
               const normH = h.toLowerCase().replace(/[^a-z0-9]/g, '');
               return normC.some(c => normH.includes(c) || c.includes(normH));
@@ -2229,7 +3018,7 @@ html_template = """<!DOCTYPE html>
           const colDateSouscr = findColIdx('date de souscription', 'datesouscription');
           const colDateRecept = findColIdx('date de reception du bordereau', 'datereception', 'date de reception');
           const colAffaire = findColIdx('affaires', 'affaire');
-          const colTypeAffaire = findColIdx("type d'affaire", "types d'affaires", 'typeaffaire');
+          const colTypeAffaire = findColIdx("type d'affaire", 'typeaffaire');
           const colCedante = findColIdx('cedante', 'cedantes');
           const colApporteur = findColIdx('apporteur', 'apporteurs');
           const colPays = findColIdx('pays (lieu du risque)', 'pays', 'lieu du risque');
@@ -2240,6 +3029,7 @@ html_template = """<!DOCTYPE html>
           const colPrimSCG = findColIdx('primes scg-re', 'primes scg');
           const colComm = findColIdx('commission');
           const colPrimNettes = findColIdx('primes nettes', 'primes nettes de reassurance');
+          const colComment = findColIdx('commentaires', 'commentaire');
 
           const parseExcelDate = (val) => {
             if (!val) return null;
@@ -2258,6 +3048,9 @@ html_template = """<!DOCTYPE html>
             const p = parseFloat(cleaned);
             return isNaN(p) ? 0 : p;
           };
+
+          const isFile2025 = file.name.includes('2025');
+          const fileYear = isFile2025 ? 2025 : 2026;
 
           let newRecords = [];
           let counter = 1;
@@ -2284,8 +3077,13 @@ html_template = """<!DOCTYPE html>
             let primNet = colPrimNettes !== -1 ? parseNum(row[colPrimNettes]) : 0;
             if (primNet === 0 && primSCG > 0) primNet = primSCG - comm;
 
+            const commentVal = colComment !== -1 ? String(row[colComment] || '').trim() : '';
+            const ssFlag = isSansSuiteJS(commentVal);
+
             newRecords.push({
               id: counter++,
+              exercice: fileYear,
+              isSansSuite: ssFlag,
               dateSouscription: dSouscr,
               dateReception: dRecept,
               delaiReceptionJours: delai,
@@ -2301,7 +3099,8 @@ html_template = """<!DOCTYPE html>
               primesSCG: primSCG,
               commission: comm,
               primesNettes: primNet,
-              etatBordereau: dRecept ? 'REÇU' : 'EN ATTENTE'
+              etatBordereau: dRecept ? 'REÇU' : 'EN ATTENTE',
+              commentaires: commentVal
             });
           }
 
@@ -2310,40 +3109,25 @@ html_template = """<!DOCTYPE html>
             return;
           }
 
-          allRecords = newRecords;
-          filteredRecords = [...allRecords];
+          if (isFile2025) {
+            records2025 = newRecords;
+            showToast(`Fichier 2025 importé : ${records2025.length} affaires enregistrées !`);
+          } else {
+            allRecords = newRecords;
+            filteredRecords = [...allRecords];
+            populateFilterOptions();
+            showToast(`Fichier 2026 importé : ${allRecords.length} affaires enregistrées !`);
+          }
 
-          const nowStr = new Date().toLocaleString('fr-FR');
-          const metaObj = {
-            records: allRecords,
+          await saveDatasetToStorage({
+            records2026: allRecords,
+            records2025: records2025,
             fileName: file.name,
-            importDate: nowStr,
-            importTimestamp: Date.now(),
-            recordCount: allRecords.length
-          };
+            importDate: new Date().toLocaleString('fr-FR')
+          });
 
-          currentDatasetMeta = {
-            isCustom: true,
-            fileName: file.name,
-            importDate: nowStr,
-            importTimestamp: metaObj.importTimestamp,
-            recordCount: allRecords.length
-          };
-
-          // Sauvegarde automatique et persistante (IndexedDB + localStorage)
-          await saveDatasetToStorage(metaObj);
-
-          updateDatasetStatusUI();
-          populateFilterOptions();
-          document.getElementById('filter-branche').value = 'ALL';
-          applyFilters();
-
-          // Réinitialiser le file input pour permettre la ré-importation du même fichier si modifié
-          const fileInp = document.getElementById('file-input');
-          if (fileInp) fileInp.value = '';
-
+          renderAll();
           document.getElementById('upload-modal').classList.add('hidden');
-          showToast(`Importation réussie : ${allRecords.length} affaires enregistrées par défaut !`);
         } catch (err) {
           console.error(err);
           alert("Erreur lors de l'analyse du fichier Excel : " + err.message);
@@ -2360,9 +3144,9 @@ html_template = """<!DOCTYPE html>
 # Replace logo source (base64 if available, fallback to logo_scg_re.png)
 logo_src = logo_b64 if logo_b64 else "logo_scg_re.png"
 
-final_html = html_template.replace('__INITIAL_RECORDS__', records_json).replace('__INITIAL_CLEANING_LOG__', log_json).replace('__LOGO_SRC__', logo_src).replace('__BUILD_TIMESTAMP__', datetime.now().isoformat())
+final_html = html_template.replace('__INITIAL_RECORDS_2026__', records_2026_json).replace('__INITIAL_RECORDS_2025__', records_2025_json).replace('__INITIAL_CLEANING_LOG__', log_json).replace('__LOGO_SRC__', logo_src).replace('__BUILD_TIMESTAMP__', datetime.now().isoformat())
 
 with open('index.html', 'w', encoding='utf-8') as f:
     f.write(final_html)
 
-print("index.html generated successfully with SCG-Ré Logo and ARO title!")
+print("index.html generated successfully with all new features (Affaires Sans Suite & Comparatif 2025 vs 2026)!")
